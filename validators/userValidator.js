@@ -39,3 +39,36 @@ function updateProfileValidator(req, res, next) {
 }
 
 module.exports.updateProfileValidator = updateProfileValidator;
+
+function updateUserValidator(req, res, next) {
+  const { nom, prenom, email, password, role, estActif } = req.body || {};
+  
+  if (nom !== undefined && typeof nom !== 'string') {
+    return res.status(400).json({ message: 'Nom invalide' });
+  }
+  if (prenom !== undefined && typeof prenom !== 'string') {
+    return res.status(400).json({ message: 'Prénom invalide' });
+  }
+  if (email !== undefined) {
+    const re = /\S+@\S+\.\S+/;
+    if (typeof email !== 'string' || !re.test(email)) {
+      return res.status(400).json({ message: 'Email invalide' });
+    }
+  }
+  if (password !== undefined && (typeof password !== 'string' || password.length < 6)) {
+    return res.status(400).json({ message: 'Mot de passe trop court (>=6)' });
+  }
+  if (role !== undefined) {
+    const roles = ['SUPER_ADMIN', 'COORDINATEUR', 'AUDITEUR'];
+    if (!roles.includes(role)) {
+      return res.status(400).json({ message: 'Role invalide' });
+    }
+  }
+  if (estActif !== undefined && typeof estActif !== 'boolean') {
+    return res.status(400).json({ message: 'estActif doit être un booléen' });
+  }
+  
+  next();
+}
+
+module.exports.updateUserValidator = updateUserValidator;
