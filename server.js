@@ -44,5 +44,13 @@ app.use('/api/auth', authRoutes);
 const userRoutes = require('./routes/userRoutes');
 app.use('/api/users', userRoutes);
 
+// Affectation routes
+const affectationRoutes = require('./routes/affectationRoutes');
+app.use('/api/affectations', affectationRoutes);
+
+// Delegation routes
+const delegationRoutes = require('./routes/delegationRoutes');
+app.use('/api/delegations', delegationRoutes);
+
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 module.exports = app;   
