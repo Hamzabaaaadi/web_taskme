@@ -199,7 +199,8 @@ async function deleteUser(req, res) {
 async function list(req, res) {
   try {
     const query = req.query.query || '';
-    const User = require('../models/User');
+    const possible = require('../models/User');
+    const User = possible && (possible.User || possible.default || possible);
     const users = await User.find({
       $or: [
         { nom: { $regex: query, $options: 'i' } },
@@ -212,4 +213,30 @@ async function list(req, res) {
   }
 }
 
-module.exports = { me, update, getById, updateUser, deleteUser, list };
+async function listAuditeurs(req, res) {
+  try {
+    const possible = require('../models/User');
+    const User = possible && (possible.User || possible.default || possible);
+    const auditeurs = await User.find({ role: 'AUDITEUR' });
+    res.json({ auditeurs });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+async function listAll(req, res) {
+  try {
+    const possible = require('../models/User');
+    const User = possible && (possible.User || possible.default || possible);
+    const users = await User.find({}).lean();
+    users.forEach(u => {
+      if (u.motDePasse) delete u.motDePasse;
+      if (u.password) delete u.password;
+    });
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { me, update, getById, updateUser, deleteUser, list, listAuditeurs, listAll };

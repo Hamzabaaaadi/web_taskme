@@ -87,5 +87,111 @@ async function list(req, res) {
   }
 }
 
-module.exports = { getMyAffectations };
-module.exports.list = list;
+async function acceptAffectation(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+    if (current.role !== 'AUDITEUR') return res.status(403).json({ message: 'Accès refusé' });
+
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+
+    try {
+      const Affectation = require('../models/Affectation');
+      const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
+      if (Model && typeof Model.findByIdAndUpdate === 'function') {
+        const mongooseLib = require('mongoose');
+        const { ObjectId } = mongooseLib.Types;
+        let queryId = id;
+        try { queryId = new ObjectId(id); } catch (e) { }
+
+        const existing = await Model.findById(queryId).lean();
+        if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
+        if (existing.auditeurId && existing.auditeurId.toString() !== current._id.toString()) {
+          return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
+        }
+
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date() } }, { new: true }).lean();
+        return res.json({ message: 'Affectation acceptée', affectation: updated });
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // fallback to raw collection
+    const mongooseLib = require('mongoose');
+    const col = mongooseLib.connection.collection('affectations');
+    const { ObjectId } = mongooseLib.Types;
+    let queryId = id;
+    try { queryId = new ObjectId(id); } catch (e) { }
+
+    const aff = await col.findOne({ _id: queryId });
+    if (!aff) return res.status(404).json({ message: 'Affectation non trouvée' });
+    if (aff.auditeurId && aff.auditeurId.toString() !== current._id.toString()) {
+      return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
+    }
+
+    await col.updateOne({ _id: queryId }, { $set: { statut: 'ACCEPTEE', dateReponse: new Date() } });
+    const updatedDoc = await col.findOne({ _id: queryId });
+    return res.json({ message: 'Affectation acceptée', affectation: updatedDoc });
+  } catch (err) {
+    console.error('acceptAffectation error:', err);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+async function refuseAffectation(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+    if (current.role !== 'AUDITEUR') return res.status(403).json({ message: 'Accès refusé' });
+
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+    const { justificatifRefus } = req.body || {};
+
+    try {
+      const Affectation = require('../models/Affectation');
+      const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
+      if (Model && typeof Model.findByIdAndUpdate === 'function') {
+        const mongooseLib = require('mongoose');
+        const { ObjectId } = mongooseLib.Types;
+        let queryId = id;
+        try { queryId = new ObjectId(id); } catch (e) { }
+
+        const existing = await Model.findById(queryId).lean();
+        if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
+        if (existing.auditeurId && existing.auditeurId.toString() !== current._id.toString()) {
+          return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
+        }
+
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date() } }, { new: true }).lean();
+        return res.json({ message: 'Affectation refusée', affectation: updated });
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    // fallback to raw collection
+    const mongooseLib = require('mongoose');
+    const col = mongooseLib.connection.collection('affectations');
+    const { ObjectId } = mongooseLib.Types;
+    let queryId = id;
+    try { queryId = new ObjectId(id); } catch (e) { }
+
+    const aff = await col.findOne({ _id: queryId });
+    if (!aff) return res.status(404).json({ message: 'Affectation non trouvée' });
+    if (aff.auditeurId && aff.auditeurId.toString() !== current._id.toString()) {
+      return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
+    }
+
+    await col.updateOne({ _id: queryId }, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date() } });
+    const updatedDoc = await col.findOne({ _id: queryId });
+    return res.json({ message: 'Affectation refusée', affectation: updatedDoc });
+  } catch (err) {
+    console.error('refuseAffectation error:', err);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+module.exports = { getMyAffectations, list, acceptAffectation, refuseAffectation };
