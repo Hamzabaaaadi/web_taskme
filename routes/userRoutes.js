@@ -5,6 +5,8 @@ const userController = require('../controllers/userController');
 const { basicAuth } = require('../middlewares/authMiddleware');
 const { updateProfileValidator, updateUserValidator } = require('../validators/userValidator');
 
+router.get('/', userController.list);
+
 router.get('/me', basicAuth, userController.me);
 router.put('/me', basicAuth, updateProfileValidator, userController.update);
 router.get('/:id', basicAuth, userController.getById);

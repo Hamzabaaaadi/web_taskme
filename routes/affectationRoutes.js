@@ -6,4 +6,6 @@ const { basicAuth } = require('../middlewares/authMiddleware');
 
 router.get('/me', basicAuth, affectationController.getMyAffectations);
 
+router.get('/', affectationController.list);
+
 module.exports = router;
