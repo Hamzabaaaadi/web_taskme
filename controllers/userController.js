@@ -196,4 +196,20 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = { me, update, getById, updateUser, deleteUser };
+async function list(req, res) {
+  try {
+    const query = req.query.query || '';
+    const User = require('../models/User');
+    const users = await User.find({
+      $or: [
+        { nom: { $regex: query, $options: 'i' } },
+        { email: { $regex: query, $options: 'i' } }
+      ]
+    });
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
+module.exports = { me, update, getById, updateUser, deleteUser, list };

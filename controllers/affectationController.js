@@ -67,4 +67,25 @@ async function getMyAffectations(req, res) {
   }
 }
 
+async function list(req, res) {
+  try {
+    // Try Mongoose model first
+    try {
+      const Affectation = require('../models/Affectation');
+      const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
+      if (Model && typeof Model.find === 'function') {
+        const affectations = await Model.find(req.query || {}).lean();
+        return res.json({ affectations });
+      }
+    } catch (e) {}
+    // Fallback to raw collection
+    const col = mongoose.connection.collection('affectations');
+    const affectations = await col.find(req.query || {}).toArray();
+    return res.json({ affectations });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', err });
+  }
+}
+
 module.exports = { getMyAffectations };
+module.exports.list = list;
