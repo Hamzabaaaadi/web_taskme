@@ -1,9 +1,14 @@
+
+require('dns').setServers(['8.8.8.8', '8.8.4.4']);
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const app = express();
 require("dotenv").config();
+
+const searchRoutes = require('./routes/searchRoutes');
+const vehiculeRoutes = require('./routes/vehiculeRoutes');
 
 const PORT = process.env.PORT || 5000;
 
@@ -16,23 +21,16 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/wwwdb', {
 }).then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error', err));
 
+// ...autres routes déjà présentes...
+app.use('/api/search', searchRoutes);
+app.use('/api/vehicles', vehiculeRoutes);
+
 // // Routes
-// const tacheRouter = require('./controllers/tacheController');
-// const userRouter = require('./controllers/userController');
-// const affectationRouter = require('./controllers/affectationController');
-// const chatRouter = require('./controllers/chatController');
-// const vehiculeRouter = require('./controllers/vehiculeController');
-// const delegationRouter = require('./controllers/delegationController');
-// const notificationRouter = require('./controllers/notificationController');
-// const historiqueRouter = require('./controllers/historiqueController');
-// app.use('/api/taches', tacheRouter);
-// app.use('/api/users', userRouter);
-// app.use('/api/affectations', affectationRouter);
-// app.use('/api/chats', chatRouter);
-// app.use('/api/vehicules', vehiculeRouter);
-// app.use('/api/delegations', delegationRouter);
-// app.use('/api/notifications', notificationRouter);
-// app.use('/api/historiques', historiqueRouter);
+const tacheRoutes = require('./routes/tacheRoutes');
+app.use('/api/tasks', tacheRoutes);
+
+const auditeurRoutes = require('./routes/auditeurRoutes');
+app.use('/api/auditeurs', auditeurRoutes);
 
 // app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -53,4 +51,4 @@ const delegationRoutes = require('./routes/delegationRoutes');
 app.use('/api/delegations', delegationRoutes);
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-module.exports = app;   
+module.exports = app;
