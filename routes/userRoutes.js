@@ -10,9 +10,9 @@ router.get('/', userController.list);
 router.get('/me', basicAuth, userController.me);
 router.put('/me', basicAuth, updateProfileValidator, userController.update);
 router.get('/all', userController.listAll);
+router.get('/auditeurs', basicAuth, userController.listAuditeurs);
 router.get('/:id', basicAuth, userController.getById);
 router.put('/:id', basicAuth, updateUserValidator, userController.updateUser);
 router.delete('/:id', basicAuth, userController.deleteUser);
-router.get('/auditeurs', basicAuth, userController.listAuditeurs);
 
 module.exports = router;
