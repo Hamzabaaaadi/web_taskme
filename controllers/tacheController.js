@@ -158,3 +158,19 @@ exports.uploadFile = async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', err });
   }
 };
+
+// Marquer une tâche comme terminée (statut = TERMINEE)
+exports.complete = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+
+    const tache = await Tache.findByIdAndUpdate(id, { statut: 'TERMINEE' }, { new: true }).lean();
+    if (!tache) return res.status(404).json({ message: 'Tâche non trouvée' });
+
+    return res.json({ message: 'Tâche marquée comme terminée', tache });
+  } catch (err) {
+    console.error('Erreur marquer tâche terminée:', err);
+    return res.status(500).json({ message: 'Erreur serveur', err });
+  }
+};

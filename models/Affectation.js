@@ -9,7 +9,7 @@ const AffectationSchema = new mongoose.Schema({
   statut: { type: String, enum: ['EN_ATTENTE','ACCEPTEE','REFUSEE','DELEGUEE','EXPIREE'], default: 'EN_ATTENTE' },
   justificatifRefus: String,
   rapportAlgorithme: String,
-  estValidee: { type: Boolean, default: false },
+  estValidee: { type: Boolean, default: true },
   dateReponse: Date,
   delaiReponse: Date,
   delegation: { type: mongoose.Schema.Types.ObjectId, ref: 'Delegation', default: null }
