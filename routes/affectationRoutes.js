@@ -9,5 +9,6 @@ router.get('/me', basicAuth, affectationController.getMyAffectations);
 router.get('/', affectationController.list);
 router.put('/:id/accept', basicAuth, affectationController.acceptAffectation);
 router.put('/:id/refuse', basicAuth, affectationController.refuseAffectation);
+router.delete('/:id', affectationController.deleteAffectation);
 
 module.exports = router;

@@ -4,7 +4,8 @@ const AffectationSchema = new mongoose.Schema({
   id: String,
   tacheId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tache', required: true },
   auditeurId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  mode: { type: String, enum: ['MANUEL','SEMI_AUTOMATISE','AUTOMATISE_IA'] },
+  // mode: MANUELLE | SEMIAUTO | AUTOMATIQUE_IA
+  mode: { type: String, enum: ['MANUELLE','SEMIAUTO','AUTOMATIQUE_IA'], default: 'MANUELLE' },
   dateAffectation: Date,
   statut: { type: String, enum: ['EN_ATTENTE','ACCEPTEE','REFUSEE','DELEGUEE','EXPIREE'], default: 'EN_ATTENTE' },
   justificatifRefus: String,

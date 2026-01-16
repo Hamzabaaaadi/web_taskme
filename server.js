@@ -9,6 +9,7 @@ require("dotenv").config();
 
 const searchRoutes = require('./routes/searchRoutes');
 const vehiculeRoutes = require('./routes/vehiculeRoutes');
+const semiautoRoutes = require('./routes/semiautoRoutes');
 
 const PORT = process.env.PORT || 5000;
 
@@ -24,10 +25,15 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/wwwdb', {
 // ...autres routes déjà présentes...
 app.use('/api/search', searchRoutes);
 app.use('/api/vehicles', vehiculeRoutes);
+app.use('/api/semiauto', semiautoRoutes);
 
 // // Routes
 const tacheRoutes = require('./routes/tacheRoutes');
 app.use('/api/tasks', tacheRoutes);
+
+// Assignment routes
+const assignmentRoutes = require('./routes/assignmentRoutes');
+app.use('/api/assignments', assignmentRoutes);
 
 const auditeurRoutes = require('./routes/auditeurRoutes');
 app.use('/api/auditeurs', auditeurRoutes);
