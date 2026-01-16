@@ -56,25 +56,14 @@ exports.validateAssign = async (req, res) => {
       if (!affectation) {
         return res.status(404).json({ error: "Affectation non trouvée" });
       }
-      // Mettre à jour le statut et le commentaire
-      affectation.statut = "ACCEPTEE"; // marque l'affectation comme acceptée
+      // Mettre à jour uniquement le champ estValidee
       affectation.estValidee = true;
       if (commentaire) affectation.justificatifRefus = commentaire;
       affectation.dateReponse = new Date();
       await affectation.save();
 
-      // Mettre à jour également le statut de la tâche parent en AFFECTEE si possible
-      try {
-        const Tache = require('../models/Tache');
-        if (affectation.tacheId) {
-          await Tache.findByIdAndUpdate(affectation.tacheId, { statut: 'AFFECTEE' });
-        }
-      } catch (e) {
-        console.error('Erreur mise à jour statut tache après validation affectation:', e && e.message ? e.message : e);
-      }
-
       return res.status(200).json({
-        message: "Affectation validée et marquée ACCEPTEE",
+        message: "Affectation validée (estValidee = true)",
         affectationId: affectation._id,
         tacheId: affectation.tacheId,
         commentaire
@@ -95,6 +84,7 @@ exports.rejectAssign = async (req, res) => {
     if (!affectation) {
       return res.status(404).json({ error: "Affectation non trouvée" });
     }
+
     // Mettre à jour le statut et le commentaire
     affectation.statut = "REFUSEE";
     // s'assurer que le flag de validation est explicitement false lorsqu'on refuse
@@ -103,7 +93,7 @@ exports.rejectAssign = async (req, res) => {
     affectation.dateReponse = new Date();
     await affectation.save();
     return res.status(200).json({
-      message: "Affectation refusée avec succès",
+      message: "Affectation refusée (estValidee = false)",
       affectationId: affectation._id,
       tacheId: affectation.tacheId,
       commentaire
