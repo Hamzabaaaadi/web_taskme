@@ -97,6 +97,8 @@ exports.rejectAssign = async (req, res) => {
     }
     // Mettre à jour le statut et le commentaire
     affectation.statut = "REFUSEE";
+    // s'assurer que le flag de validation est explicitement false lorsqu'on refuse
+    affectation.estValidee = false;
     if (commentaire) affectation.justificatifRefus = commentaire;
     affectation.dateReponse = new Date();
     await affectation.save();

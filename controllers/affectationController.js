@@ -136,7 +136,7 @@ async function acceptAffectation(req, res) {
           return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
         }
 
-        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date() } }, { new: true }).lean();
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true } }, { new: true }).lean();
         return res.json({ message: 'Affectation acceptée', affectation: updated });
       }
     } catch (e) {
@@ -156,7 +156,7 @@ async function acceptAffectation(req, res) {
       return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
     }
 
-    await col.updateOne({ _id: queryId }, { $set: { statut: 'ACCEPTEE', dateReponse: new Date() } });
+    await col.updateOne({ _id: queryId }, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true } });
     const updatedDoc = await col.findOne({ _id: queryId });
     return res.json({ message: 'Affectation acceptée', affectation: updatedDoc });
   } catch (err) {
@@ -190,7 +190,7 @@ async function refuseAffectation(req, res) {
           return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
         }
 
-        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date() } }, { new: true }).lean();
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date(), estValidee: false } }, { new: true }).lean();
         return res.json({ message: 'Affectation refusée', affectation: updated });
       }
     } catch (e) {
@@ -210,7 +210,7 @@ async function refuseAffectation(req, res) {
       return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
     }
 
-    await col.updateOne({ _id: queryId }, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date() } });
+    await col.updateOne({ _id: queryId }, { $set: { statut: 'REFUSEE', justificatifRefus: justificatifRefus || null, dateReponse: new Date(), estValidee: false } });
     const updatedDoc = await col.findOne({ _id: queryId });
     return res.json({ message: 'Affectation refusée', affectation: updatedDoc });
   } catch (err) {
