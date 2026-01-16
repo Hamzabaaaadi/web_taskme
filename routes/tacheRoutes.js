@@ -18,4 +18,7 @@ router.post('/affectation/:affectationId/reject', tacheController.rejectAssign);
 router.post('/:id/assign/delegé', tacheController.delegateAssign);
  // Marquer une tâche comme terminée
 router.post('/:id/complete', tacheController.complete)
+// Admin helpers
+router.post('/:id/set-specialites', tacheController.setSpecialites);
+router.post('/:id/ensure-specialites', tacheController.ensureSpecialites);
 module.exports = router;

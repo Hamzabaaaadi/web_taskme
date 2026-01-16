@@ -1,7 +1,7 @@
 exports.assign = async (req, res) => {
   // Affecter un ou plusieurs auditeurs à une tâche
   try {
-    const { auditeurId } = req.body;
+    const { auditeurId, mode } = req.body;
     const tacheId = req.params.id;
     if (!auditeurId) {
       return res.status(400).json({ error: "auditeurId requis" });
@@ -14,11 +14,21 @@ exports.assign = async (req, res) => {
       return res.status(404).json({ error: "Tâche non trouvée" });
     }
 
+    // Validate mode if provided, otherwise default will be applied by the schema
+    const allowedModes = ['MANUELLE','SEMIAUTO','AUTOMATIQUE_IA'];
+    let chosenMode = mode;
+    if (typeof chosenMode === 'undefined' || chosenMode === null) {
+      chosenMode = 'MANUELLE';
+    } else if (!allowedModes.includes(chosenMode)) {
+      return res.status(400).json({ error: `mode invalide. Valeurs autorisées: ${allowedModes.join(', ')}` });
+    }
+
     // Créer l'affectation réelle
     const Affectation = require('../models/Affectation');
     const affectation = new Affectation({
       tacheId,
       auditeurId,
+      mode: chosenMode,
       dateAffectation: new Date()
     });
     await affectation.save();
@@ -47,13 +57,24 @@ exports.validateAssign = async (req, res) => {
         return res.status(404).json({ error: "Affectation non trouvée" });
       }
       // Mettre à jour le statut et le commentaire
-      affectation.statut = "ACCEPTEE";
+      affectation.statut = "ACCEPTEE"; // marque l'affectation comme acceptée
       affectation.estValidee = true;
       if (commentaire) affectation.justificatifRefus = commentaire;
       affectation.dateReponse = new Date();
       await affectation.save();
+
+      // Mettre à jour également le statut de la tâche parent en AFFECTEE si possible
+      try {
+        const Tache = require('../models/Tache');
+        if (affectation.tacheId) {
+          await Tache.findByIdAndUpdate(affectation.tacheId, { statut: 'AFFECTEE' });
+        }
+      } catch (e) {
+        console.error('Erreur mise à jour statut tache après validation affectation:', e && e.message ? e.message : e);
+      }
+
       return res.status(200).json({
-        message: "Affectation validée avec succès",
+        message: "Affectation validée et marquée ACCEPTEE",
         affectationId: affectation._id,
         tacheId: affectation.tacheId,
         commentaire
@@ -171,6 +192,63 @@ exports.complete = async (req, res) => {
     return res.json({ message: 'Tâche marquée comme terminée', tache });
   } catch (err) {
     console.error('Erreur marquer tâche terminée:', err);
+    return res.status(500).json({ message: 'Erreur serveur', err });
+  }
+};
+
+// Admin helper: set specialitesConcernees for a task
+exports.setSpecialites = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { specialitesConcernees } = req.body;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+    if (!specialitesConcernees || !Array.isArray(specialitesConcernees)) return res.status(400).json({ message: 'specialitesConcernees (array) requis' });
+
+    const Tache = require('../models/Tache');
+    const tache = await Tache.findByIdAndUpdate(id, { specialitesConcernees }, { new: true }).lean();
+    if (!tache) return res.status(404).json({ message: 'Tâche non trouvée' });
+
+    return res.json({ message: 'specialitesConcernees mises à jour', tache });
+  } catch (err) {
+    console.error('Erreur setSpecialites:', err);
+    return res.status(500).json({ message: 'Erreur serveur', err });
+  }
+};
+
+// Admin helper: derive specialites from task.type and set them
+exports.ensureSpecialites = async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+
+    const Tache = require('../models/Tache');
+    const tache = await Tache.findById(id).lean();
+    if (!tache) return res.status(404).json({ message: 'Tâche non trouvée' });
+
+    const normalizeStr = (v) => {
+      if (v === null || v === undefined) return null;
+      let s = String(v).trim().toLowerCase();
+      s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      s = s.replace(/\s+/g, '_');
+      s = s.replace(/[^a-z0-9_]/g, '_');
+      return s;
+    };
+
+    const canonicalMap = {
+      'pedagogique': 'PEDAGOGIQUE', 'pédagogique': 'PEDAGOGIQUE', 'formateur': 'PEDAGOGIQUE',
+      'orientation': 'ORIENTATION', 'planification': 'PLANIFICATION',
+      'services_financiers': 'SERVICES_FINANCIERS', 'finance': 'SERVICES_FINANCIERS'
+    };
+
+    const taskType = tache.type || tache.specialite || null;
+    const taskTypeNorm = normalizeStr(taskType);
+    const mapped = canonicalMap[taskTypeNorm];
+    if (!mapped) return res.status(400).json({ message: 'Impossible de déduire specialites depuis task.type', taskType, taskTypeNorm });
+
+    const updated = await Tache.findByIdAndUpdate(id, { specialitesConcernees: [mapped] }, { new: true }).lean();
+    return res.json({ message: 'specialitesConcernees déduites et mises à jour', tache: updated });
+  } catch (err) {
+    console.error('Erreur ensureSpecialites:', err);
     return res.status(500).json({ message: 'Erreur serveur', err });
   }
 };
