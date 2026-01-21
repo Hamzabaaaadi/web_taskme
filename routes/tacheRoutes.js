@@ -4,6 +4,8 @@ const tacheController = require('../controllers/tacheController');
 const { upload } = require('../middlewares/uploadMiddleware');
 
 router.get('/', tacheController.list);
+// Retourne le nombre total de tâches (peut être filtré via query)
+router.get('/count', tacheController.count);
 router.get('/:id', tacheController.detail);
 router.post('/', tacheController.create);
 router.put('/:id', tacheController.update);

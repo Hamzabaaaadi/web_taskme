@@ -32,17 +32,28 @@ async function getMyAffectations(req, res) {
           .populate('auditeurId', 'nom prenom email')
           .sort({ dateAffectation: -1 })
           .lean();
-        // Ensure `mode` is present for each affectation (default to MANUELLE)
-        const normalized = (affectations || []).map(a => {
-          if (!a.mode) a.mode = 'MANUELLE';
-          return a;
-        });
 
-        return res.json({ 
-          message: 'Affectations récupérées avec succès',
-          count: normalized.length,
-          affectations: normalized
-        });
+        // If populate failed (auditeurId === null), fetch raw auditeurId from collection and fill it.
+        try {
+          const col = mongoose.connection.collection('affectations');
+          const ids = (affectations || []).map(a => a._id);
+          if (ids.length > 0) {
+            const rawDocs = await col.find({ _id: { $in: ids } }).project({ auditeurId: 1 }).toArray();
+            const rawMap = new Map(rawDocs.map(d => [d._id.toString(), d.auditeurId]));
+            for (const a of affectations) {
+              if ((a.auditeurId === null || a.auditeurId === undefined) && rawMap.has(a._id.toString())) {
+                a.auditeurId = rawMap.get(a._id.toString());
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch raw auditeurId fallback:', e && e.message ? e.message : e);
+        }
+
+        // Ensure `mode` is present for each affectation (default to MANUELLE)
+        const normalized = (affectations || []).map(a => { if (!a.mode) a.mode = 'MANUELLE'; return a; });
+
+        return res.json({ message: 'Affectations récupérées avec succès', count: normalized.length, affectations: normalized });
       }
     } catch (e) {
       console.error('Mongoose model error:', e);
@@ -87,11 +98,26 @@ async function list(req, res) {
           .populate('tacheId', 'nom statut')
           .populate('auditeurId', 'nom prenom email')
           .lean();
+
+        // Fill raw auditeurId when populate returned null
+        try {
+          const col = mongoose.connection.collection('affectations');
+          const ids = (affectations || []).map(a => a._id);
+          if (ids.length > 0) {
+            const rawDocs = await col.find({ _id: { $in: ids } }).project({ auditeurId: 1 }).toArray();
+            const rawMap = new Map(rawDocs.map(d => [d._id.toString(), d.auditeurId]));
+            for (const a of affectations) {
+              if ((a.auditeurId === null || a.auditeurId === undefined) && rawMap.has(a._id.toString())) {
+                a.auditeurId = rawMap.get(a._id.toString());
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch raw auditeurId fallback:', e && e.message ? e.message : e);
+        }
+
         // ensure `mode` is present (schema default should handle new docs)
-        const normalized = (affectations || []).map(a => {
-          if (!a.mode) a.mode = 'MANUELLE';
-          return a;
-        });
+        const normalized = (affectations || []).map(a => { if (!a.mode) a.mode = 'MANUELLE'; return a; });
         return res.json({ affectations: normalized });
       }
     } catch (e) {

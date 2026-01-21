@@ -3,6 +3,8 @@ require('dns').setServers(['8.8.8.8', '8.8.4.4']);
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
+// Ensure Mongoose models are registered (User model required for populate to work)
+require('./models/User');
 const cors = require('cors');
 const app = express();
 require("dotenv").config();

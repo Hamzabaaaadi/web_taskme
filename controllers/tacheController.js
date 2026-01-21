@@ -121,6 +121,63 @@ exports.list = async (req, res) => {
   }
 };
 
+// Retourne le nombre total de taches, la répartition rémunérées/non rémunérées
+// et la répartition par types (pédagogique, orientation, planification, services_financiers).
+// Les autres filtres passés en query sont appliqués, à l'exception de `estRemuneree`
+// qui est géré séparément pour la partie rémunération.
+exports.count = async (req, res) => {
+  try {
+    const rawQuery = req.query || {};
+    // Construire un filtre de base en excluant explicitement `estRemuneree`
+    // pour pouvoir calculer séparément les comptes rémunérées / non rémunérées.
+    const baseFilter = { ...rawQuery };
+    if (Object.prototype.hasOwnProperty.call(baseFilter, 'estRemuneree')) {
+      delete baseFilter.estRemuneree;
+    }
+
+    const remunereeFilter = { ...baseFilter, estRemuneree: true };
+    const nonRemunereeFilter = { ...baseFilter, estRemuneree: false };
+
+    // Categories à compter (clé exposée -> valeur canonique utilisée dans specialitesConcernees)
+    const categories = [
+      { key: 'pédagogique', canon: 'pédagogique' },
+      { key: 'orientation', canon: 'ORIENTATION' },
+      { key: 'planification', canon: 'PLANIFICATION' },
+      { key: 'services_financiers', canon: 'SERVICES_FINANCIERS' }
+    ];
+
+    // Pour chaque catégorie, compter les tâches dont `specialitesConcernees` contient la valeur
+    // ou dont `type` correspond (cas-insensitif) à la valeur canonique.
+    const typeCountPromises = categories.map(cat => {
+      const filter = {
+        ...baseFilter,
+        $or: [
+          { specialitesConcernees: cat.canon },
+          { type: { $regex: `^${cat.canon}$`, $options: 'i' } }
+        ]
+      };
+      return Tache.countDocuments(filter).then(count => ({ key: cat.key, count }));
+    });
+
+    const [countRemuneree, countNonRemuneree, ...typeCountsResults] = await Promise.all([
+      Tache.countDocuments(remunereeFilter),
+      Tache.countDocuments(nonRemunereeFilter),
+      ...typeCountPromises
+    ]);
+
+    const total = countRemuneree + countNonRemuneree;
+
+    const countsByType = typeCountsResults.reduce((acc, cur) => {
+      acc[cur.key] = cur.count;
+      return acc;
+    }, {});
+
+    res.json({ count: total, countRemuneree, countNonRemuneree, countsByType });
+  } catch (err) {
+    res.status(500).json({ message: 'Erreur serveur', err });
+  }
+};
+
 exports.detail = async (req, res) => {
   try {
     const tache = await Tache.findById(req.params.id).lean();

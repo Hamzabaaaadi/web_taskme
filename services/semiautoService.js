@@ -86,7 +86,7 @@ async function propose(taskId, options = {}) {
   let effective = taskSpecsNorm.slice();
   if (effective.length === 0 && taskTypeNorm) {
     if (canonical[taskTypeNorm]) effective = [canonical[taskTypeNorm]];
-    else return { taskId: task._id, nombrePlaces: task.nombrePlaces || null, candidats: [], eligible: [], exclus: [] };
+    // else: do not return early — allow broader fallback logic below to propose candidates
   }
 
   const active = await Affectation.find({ statut: { $in: ['ACCEPTEE','EN_COURS'] } }).populate('tacheId', 'dateDebut dateFin').lean();
@@ -192,7 +192,9 @@ async function propose(taskId, options = {}) {
   });
   // Only consider excluded auditors that do have a matching specialty (matchLevel>0)
   // auditors with matchLevel === 0 are permanently ineligible per new requirement
-  excludedScores = excludedScores.filter(es => es.auditor && (es.auditor._matchLevel || 0) > 0);
+  // Keep excluded auditors in the pool even if they don't have a primary specialty match.
+  // This allows controlled fallback proposals when no strict matches are found.
+  // (They will be sorted with lower priority and marked `requiresApproval: true`.)
   excludedScores.sort((x, y) => {
     // prefer higher matchLevel among excluded (if present), then anciennete, then lower load, then score
     const xm = (x.auditor && (x.auditor._matchLevel || 0)) || 0;
