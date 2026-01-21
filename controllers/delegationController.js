@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Delegation = require('../models/Delegation');
+const Affectation = require('../models/Affectation');
 
 /* ================================
    CREER UNE DELEGATION
@@ -34,9 +35,22 @@ async function createDelegation(req, res) {
 
     await delegation.save();
 
+    // Mettre à jour l'affectation originale : statut -> DELEGUEE et lier la délégation
+    let updatedAffectation = null;
+    try {
+      updatedAffectation = await Affectation.findByIdAndUpdate(
+        affectationOriginale,
+        { statut: 'DELEGUEE', delegation: delegation._id },
+        { new: true }
+      );
+    } catch (err) {
+      console.error('Erreur lors de la mise à jour de l\'affectation:', err);
+    }
+
     return res.status(201).json({
       message: 'Délégation créée avec succès',
-      delegation
+      delegation,
+      affectation: updatedAffectation
     });
 
   } catch (error) {
@@ -75,6 +89,132 @@ async function getMyDelegations(req, res) {
 
   } catch (error) {
     console.error('getMyDelegations error:', error);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+/* ================================
+   MES DELEGATIONS CREEES (AUDITEUR)
+   Délégations proposées / émises par l'auditeur connecté
+================================ */
+async function getMyProposedDelegations(req, res) {
+  try {
+    const current = req.user;
+    if (!current) {
+      return res.status(401).json({ message: 'Non authentifié' });
+    }
+
+    if (current.role !== 'AUDITEUR') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const delegations = await Delegation.find({
+      auditeurInitial: current._id
+    })
+      .populate('affectationOriginale')
+      .populate('auditeurInitial', 'nom prenom email')
+      .populate('auditeurPropose', 'nom prenom email')
+      .sort({ dateProposition: -1 });
+
+    return res.json({
+      message: 'Délégations créées récupérées avec succès',
+      count: delegations.length,
+      delegations
+    });
+
+  } catch (error) {
+    console.error('getMyProposedDelegations error:', error);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+/* ================================
+   MODIFIER UNE DELEGATION
+   Seul l'auditeur initial peut modifier si statut = EN_ATTENTE
+================================ */
+async function updateDelegation(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+    if (current.role !== 'AUDITEUR') return res.status(403).json({ message: 'Accès refusé' });
+
+    const delegationId = req.params.id;
+    if (!delegationId) return res.status(400).json({ message: 'Id de délégation requis' });
+
+    const delegation = await Delegation.findById(delegationId);
+    if (!delegation) return res.status(404).json({ message: 'Délégation non trouvée' });
+
+    if (delegation.auditeurInitial?.toString() !== current._id.toString()) {
+      return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à modifier cette délégation' });
+    }
+
+    if (delegation.statut !== 'EN_ATTENTE') {
+      return res.status(400).json({ message: 'Impossible de modifier une délégation déjà traitée' });
+    }
+
+    const { auditeurPropose, justification } = req.body;
+    if (auditeurPropose && auditeurPropose.toString() === delegation.auditeurInitial?.toString()) {
+      return res.status(400).json({ message: 'Impossible de déléguer à soi-même' });
+    }
+
+    if (auditeurPropose) delegation.auditeurPropose = auditeurPropose;
+    if (typeof justification !== 'undefined') delegation.justification = justification;
+
+    await delegation.save();
+
+    return res.json({ message: 'Délégation mise à jour avec succès', delegation });
+
+  } catch (error) {
+    console.error('updateDelegation error:', error);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+/* ================================
+   SUPPRIMER UNE DELEGATION
+   Seul l'auditeur initial peut supprimer si statut = EN_ATTENTE
+   et on remet l'affectation à EN_ATTENTE + clear delegation
+================================ */
+async function deleteDelegation(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+    if (current.role !== 'AUDITEUR') return res.status(403).json({ message: 'Accès refusé' });
+
+    const delegationId = req.params.id;
+    if (!delegationId) return res.status(400).json({ message: 'Id de délégation requis' });
+
+    const delegation = await Delegation.findById(delegationId);
+    if (!delegation) return res.status(404).json({ message: 'Délégation non trouvée' });
+
+    if (delegation.auditeurInitial?.toString() !== current._id.toString()) {
+      return res.status(403).json({ message: 'Vous n\'êtes pas autorisé à supprimer cette délégation' });
+    }
+
+    if (delegation.statut !== 'EN_ATTENTE') {
+      return res.status(400).json({ message: 'Impossible de supprimer une délégation déjà traitée' });
+    }
+
+    const affectationId = delegation.affectationOriginale;
+
+    await Delegation.findByIdAndDelete(delegationId);
+
+    if (affectationId) {
+      try {
+        await Affectation.findByIdAndUpdate(
+          affectationId,
+          { statut: 'EN_ATTENTE', delegation: null },
+          { new: true }
+        );
+      } catch (err) {
+        console.error('Erreur lors du rollback de l\'affectation:', err);
+      }
+    }
+
+    return res.json({ message: 'Délégation supprimée avec succès' });
+
+  } catch (error) {
+    console.error('deleteDelegation error:', error);
     return res.status(500).json({ message: 'Erreur serveur' });
   }
 }
@@ -149,6 +289,9 @@ async function refuserDelegation(req, res) {
 module.exports = {
   createDelegation,
   getMyDelegations,
+  getMyProposedDelegations,
+  updateDelegation,
+  deleteDelegation,
   accepterDelegation,
   refuserDelegation
 };

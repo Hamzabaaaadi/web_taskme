@@ -21,3 +21,24 @@ exports.list = async (req, res) => {
     res.status(500).json({ message: 'Erreur serveur', err });
   }
 };
+
+// Récupérer toutes les informations d'un auditeur par ID
+exports.getById = async (req, res) => {
+  try {
+    const auditeurId = req.params.id;
+    if (!auditeurId) return res.status(400).json({ message: "ID d'auditeur manquant" });
+
+    let auditeur;
+    if (Auditeur && typeof Auditeur.findById === 'function') {
+      auditeur = await Auditeur.findById(auditeurId).lean();
+    } else {
+      const col = mongoose.connection.collection('auditeurs');
+      auditeur = await col.findOne({ _id: new mongoose.Types.ObjectId(auditeurId) });
+    }
+
+    if (!auditeur) return res.status(404).json({ message: "Auditeur non trouvé" });
+    return res.json({ auditeur });
+  } catch (err) {
+    return res.status(500).json({ message: 'Erreur serveur', err });
+  }
+};
