@@ -86,6 +86,20 @@ async function getMyAffectations(req, res) {
 
     const auditeurId = current._id;
 
+    // Find any Auditeur documents that reference this user (some affectations
+    // store auditeur IDs from the `auditeurs` collection instead of `users`).
+    let auditeurIdsFromAudCollection = [];
+    try {
+      const Auditeur = (() => { try { return require('../models/Auditeur'); } catch (e) { return null; } })();
+      const AudModel = Auditeur && (Auditeur.Auditeur || Auditeur.default || Auditeur);
+      if (AudModel && typeof AudModel.find === 'function') {
+        const auds = await AudModel.find({ userId: current._id }).lean();
+        if (auds && auds.length) auditeurIdsFromAudCollection = auds.map(a => a._id);
+      }
+    } catch (e) {
+      // ignore
+    }
+
     // Try Mongoose model first
     try {
       const Affectation = require('../models/Affectation');
@@ -101,7 +115,31 @@ async function getMyAffectations(req, res) {
           // garder l'ID tel quel si conversion échoue
         }
 
-        const affectations = await Model.find({ auditeurId: queryId })
+        // Chercher les affectations où l'auditeur est:
+        // - directement dans auditeurId (ObjectId/string)
+        // - auditeurId._id (parfois stocké comme objet)
+        // - ou présent dans le rapportAffectation.candidats (SEMIAUTO où l'id est uniquement dans le rapport)
+        // Build OR query covering both ObjectId and string storage formats,
+        // and include any auditeur IDs coming from the `auditeurs` collection.
+        const queryIdStr = String(queryId);
+        const orQuery = [
+          { auditeurId: queryId },
+          { auditeurId: queryIdStr },
+          { 'auditeurId._id': queryId },
+          { 'auditeurId._id': queryIdStr },
+          { 'rapportAffectation.candidats.auditeurId': queryId },
+          { 'rapportAffectation.candidats.auditeurId': queryIdStr }
+        ];
+        if (auditeurIdsFromAudCollection && auditeurIdsFromAudCollection.length) {
+          orQuery.push({ auditeurId: { $in: auditeurIdsFromAudCollection } });
+          orQuery.push({ auditeurId: { $in: auditeurIdsFromAudCollection.map(String) } });
+          orQuery.push({ 'auditeurId._id': { $in: auditeurIdsFromAudCollection } });
+          orQuery.push({ 'auditeurId._id': { $in: auditeurIdsFromAudCollection.map(String) } });
+          orQuery.push({ 'rapportAffectation.candidats.auditeurId': { $in: auditeurIdsFromAudCollection } });
+          orQuery.push({ 'rapportAffectation.candidats.auditeurId': { $in: auditeurIdsFromAudCollection.map(String) } });
+        }
+
+        const affectations = await Model.find({ $or: orQuery })
           .populate('tacheId', 'nom description statut')
           .populate('auditeurId', 'nom prenom email')
           .sort({ dateAffectation: -1 })
@@ -126,6 +164,33 @@ async function getMyAffectations(req, res) {
 
         // Ensure `mode` is present for each affectation (default to MANUELLE)
         const normalized = (affectations || []).map(a => { if (!a.mode) a.mode = 'MANUELLE'; return a; });
+
+        // If an affectation has no auditeurId but the current user appears in
+        // rapportAffectation.candidats, mark it as proposed for the current user
+        // and fill auditeurId with minimal info so the front can display it.
+        try {
+          for (const a of normalized) {
+            if (a && !a.auditeurId) {
+              try {
+                const rap = a.rapportAffectation || a.report || null;
+                if (rap && Array.isArray(rap.candidats) && rap.candidats.length) {
+                  const idx = rap.candidats.findIndex(c => String(c.auditeurId) === String(current._id) || String(c._id) === String(current._id));
+                  if (idx !== -1) {
+                    const cand = rap.candidats[idx] || {};
+                    const nom = cand.nom || cand.name || current.nom || null;
+                    const prenom = cand.prenom || cand.firstName || current.prenom || null;
+                    a.auditeurId = { _id: String(current._id), nom: nom, prenom: prenom };
+                    a.proposedToCurrentUser = true;
+                    a.propositionScore = cand && (cand.score || cand.probability || cand.confidence) ? (cand.score || cand.probability || cand.confidence) : null;
+                    a.candidateIndex = idx;
+                  }
+                }
+              } catch (e) {
+                // ignore per-item errors
+              }
+            }
+          }
+        } catch (e) {}
 
         // For SEMIAUTO affectations: if auditeurId is present but not populated,
         // fetch user names in batch and attach auditeurNom / auditeurPrenom to response.
@@ -227,8 +292,29 @@ async function getMyAffectations(req, res) {
     } catch (e) { 
       // garder l'ID tel quel si conversion échoue
     }
+    const queryIdStr = String(queryId);
 
-    const affectations = await col.find({ auditeurId: queryId }).toArray();
+    const orQueryRaw = [
+      { auditeurId: queryId },
+      { auditeurId: queryIdStr },
+      { 'auditeurId._id': queryId },
+      { 'auditeurId._id': queryIdStr },
+      { 'rapportAffectation.candidats.auditeurId': queryId },
+      { 'rapportAffectation.candidats.auditeurId': queryIdStr }
+    ];
+
+    try {
+      if (auditeurIdsFromAudCollection && auditeurIdsFromAudCollection.length) {
+        orQueryRaw.push({ auditeurId: { $in: auditeurIdsFromAudCollection } });
+        orQueryRaw.push({ auditeurId: { $in: auditeurIdsFromAudCollection.map(String) } });
+        orQueryRaw.push({ 'auditeurId._id': { $in: auditeurIdsFromAudCollection } });
+        orQueryRaw.push({ 'auditeurId._id': { $in: auditeurIdsFromAudCollection.map(String) } });
+        orQueryRaw.push({ 'rapportAffectation.candidats.auditeurId': { $in: auditeurIdsFromAudCollection } });
+        orQueryRaw.push({ 'rapportAffectation.candidats.auditeurId': { $in: auditeurIdsFromAudCollection.map(String) } });
+      }
+    } catch (e) {}
+
+    const affectations = await col.find({ $or: orQueryRaw }).toArray();
     const normalized = (affectations || []).map(a => { if (!a.mode) a.mode = 'MANUELLE'; return a; });
 
     await enrichSemiAutoNames(normalized);
