@@ -2,6 +2,29 @@ exports.assign = async (req, res) => {
   // Affecter un ou plusieurs auditeurs à une tâche
   try {
     const { auditeurId, mode } = req.body;
+    // Normalize auditeurId: accept string, object with _id/id, or array
+    function resolveAuditeurId(raw) {
+      if (!raw) return null;
+      if (Array.isArray(raw)) return resolveAuditeurId(raw[0]);
+      if (typeof raw === 'string') return raw;
+      if (typeof raw === 'object') {
+        if (raw._id) return String(raw._id);
+        if (raw.id) return String(raw.id);
+        // sometimes front-end may send nested object like { auditeurId: { _id: '...' } }
+        for (const k of Object.keys(raw)) {
+          const v = raw[k];
+          if (v && (typeof v === 'string' || typeof v === 'object')) {
+            const candidate = resolveAuditeurId(v);
+            if (candidate) return candidate;
+          }
+        }
+      }
+      return null;
+    }
+    const resolvedAuditeurId = resolveAuditeurId(auditeurId);
+    if (!resolvedAuditeurId) {
+      return res.status(400).json({ error: 'auditeurId requis ou invalide' });
+    }
     const tacheId = req.params.id;
     if (!auditeurId) {
       return res.status(400).json({ error: "auditeurId requis" });
@@ -27,17 +50,32 @@ exports.assign = async (req, res) => {
     const Affectation = require('../models/Affectation');
     const affectation = new Affectation({
       tacheId,
-      auditeurId,
+      auditeurId: resolvedAuditeurId,
       mode: chosenMode,
       dateAffectation: new Date()
     });
     await affectation.save();
 
+    // Create a Notification for the destinataire so the auditor receives the request
+    try {
+      const Notification = require('../models/Notification');
+      const notif = new Notification({
+        destinataireId: resolvedAuditeurId,
+        type: 'AFFECTATION',
+        titre: chosenMode === 'SEMIAUTO' ? 'Proposition d\'affectation' : 'Affectation',
+        message: `Vous avez une nouvelle ${chosenMode === 'SEMIAUTO' ? 'proposition' : 'affectation'} pour la tâche: ${tache && tache.nom ? tache.nom : String(tacheId)}`,
+        dateEnvoi: new Date()
+      });
+      await notif.save();
+    } catch (e) {
+      console.warn('Failed to create notification for affectation:', e && e.message ? e.message : e);
+    }
+
     return res.status(201).json({
       message: "Affectation créée avec succès",
       affectationId: affectation._id,
       tacheId,
-      auditeurId
+      auditeurId: resolvedAuditeurId
     });
   } catch (error) {
     console.error("Erreur assignation:", error);

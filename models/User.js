@@ -5,6 +5,11 @@ const userSchema = new mongoose.Schema(
     nom: { type: String, required: true },
     prenom: { type: String, required: true },
 
+    embedding: {
+      type: [Number],
+      default: undefined
+    },
+
     email: {
       type: String,
       required: true,

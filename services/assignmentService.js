@@ -178,7 +178,7 @@ async function computeProposal(taskId) {
       if (canonicalMap[taskTypeNorm]) effectiveSpecialitesNorm = [canonicalMap[taskTypeNorm]];
       else {
         // strict mode: task has no specialites and type is not mappable -> mark as misconfigured
-        const excludedAll = auditors.map(a => ({ auditorId: (a._id || a.id), reasons: ['no_specialite_configured'] }));
+        const excludedAll = auditors.map(a => ({ auditorId: (a._id || a.id) }));
         return { taskId: task._id, candidats: [], eligible: [], exclus: excludedAll, status: 'computed', createdAt: new Date() };
       }
     }
@@ -235,9 +235,9 @@ async function computeProposal(taskId) {
 
   const proposalData = {
     taskId: task._id,
-    candidats: selected.map(s => ({ auditorId: s._id || s.id, score: s.score, auditor: s })),
+    candidats,
     eligible: eligibleWithScores.map(e => ({ auditorId: e._id || e.id, score: e.score, auditor: e })),
-    exclus: excluded,
+    exclus: excluded.map(e => ({ auditorId: e.auditorId })),
     status: 'computed',
     createdAt: new Date()
   };

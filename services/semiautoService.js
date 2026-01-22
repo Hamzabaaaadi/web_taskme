@@ -153,14 +153,16 @@ async function propose(taskId, options = {}) {
     }
 
     if (reasons.length) {
-      excluded.push({ auditorId: a._id || a.id, reasons });
+      const idVal = (a && (a._id || a.id)) ? String(a._id || a.id) : null;
+      excluded.push({ auditeurId: idVal, reasons });
     } else {
       eligible.push(a);
     }
 
     // collect diagnostics if requested
     if (options.debug) {
-      diagnostics.push({ auditorId: a._id || a.id, name: a.nom || a.name || a.fullName || null, audSpec: audSpec, audSpecNorm, matchLevel, reasons });
+      const idVal = (a && (a._id || a.id)) ? String(a._id || a.id) : null;
+      diagnostics.push({ auditeurId: idVal, name: a.nom || a.name || a.fullName || null, audSpec: audSpec, audSpecNorm, matchLevel, reasons });
     }
   }
 
@@ -185,7 +187,7 @@ async function propose(taskId, options = {}) {
   for (const a of auditors) auditorsById[(a._id || a.id).toString()] = a;
 
   let excludedScores = excluded.map(e => {
-    const id = (e.auditorId || '').toString();
+    const id = (e.auditeurId || '').toString();
     const aud = auditorsById[id];
     const score = aud ? computeScore(aud) : 0;
     return { auditor: aud, score, reasons: e.reasons };
@@ -213,14 +215,16 @@ async function propose(taskId, options = {}) {
   const candidats = [];
 
   for (const s of eligibleScores.slice(0, numberToSelect)) {
-    candidats.push({ auditorId: s.auditor._id || s.auditor.id, score: s.score, auditor: s.auditor, requiresApproval: false, reasons: [] });
+    const idVal = (s && s.auditor && (s.auditor._id || s.auditor.id)) ? String(s.auditor._id || s.auditor.id) : null;
+    candidats.push({ auditeurId: idVal, score: s.score, auditor: s.auditor, requiresApproval: false, reasons: [] });
   }
 
   if (candidats.length < numberToSelect) {
     const need = numberToSelect - candidats.length;
     for (let i = 0; i < Math.min(need, excludedScores.length); i++) {
       const s = excludedScores[i];
-      candidats.push({ auditorId: s.auditor && (s.auditor._id || s.auditor.id), score: s.score, auditor: s.auditor, requiresApproval: true, reasons: s.reasons });
+      const idVal = (s && s.auditor && (s.auditor._id || s.auditor.id)) ? String(s.auditor._id || s.auditor.id) : null;
+      candidats.push({ auditeurId: idVal, score: s.score, auditor: s.auditor, requiresApproval: true, reasons: s.reasons });
     }
   }
 
@@ -244,7 +248,7 @@ async function propose(taskId, options = {}) {
 
     const secondaryList = [];
     for (const e of excluded) {
-      const id = (e.auditorId || '').toString();
+      const id = (e.auditeurId || '').toString();
       const aud = auditorsById[id];
       if (!aud) continue;
       const audSpec = aud.specialite || aud.specialitesConcernees || aud.specialites || null;
@@ -262,7 +266,8 @@ async function propose(taskId, options = {}) {
 
     for (let i=0; i<Math.min(need2, secondaryScores.length); i++) {
       const s = secondaryScores[i];
-      candidats.push({ auditorId: s.auditor && (s.auditor._id || s.auditor.id), score: s.score, auditor: s.auditor, requiresApproval: true, reasons: ['secondary_specialite'] });
+      const idVal = (s && s.auditor && (s.auditor._id || s.auditor.id)) ? String(s.auditor._id || s.auditor.id) : null;
+      candidats.push({ auditeurId: idVal, score: s.score, auditor: s.auditor, requiresApproval: true, reasons: ['secondary_specialite'] });
     }
   }
 
@@ -270,7 +275,7 @@ async function propose(taskId, options = {}) {
     console.log('[semiauto] selected', candidats.length, 'for task', task._id && task._id.toString ? task._id.toString() : task._id, 'needed', numberToSelect);
   }
 
-  const result = { taskId: task._id, nombrePlaces: task.nombrePlaces || null, candidats, eligible: eligibleScores.map(s => ({ auditorId: s.auditor._id || s.auditor.id, score: s.score, auditor: s.auditor })), exclus: excluded };
+  const result = { taskId: task._id, nombrePlaces: task.nombrePlaces || null, candidats, eligible: eligibleScores.map(s => ({ auditeurId: (s && s.auditor && (s.auditor._id || s.auditor.id)) ? String(s.auditor._id || s.auditor.id) : null, score: s.score, auditor: s.auditor })), exclus: excluded };
   if (options.debug) result.diagnostics = diagnostics;
   return result;
 }
