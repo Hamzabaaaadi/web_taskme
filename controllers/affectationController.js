@@ -412,11 +412,68 @@ async function acceptAffectation(req, res) {
 
         const existing = await Model.findById(queryId).lean();
         if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
-        if (existing.auditeurId && existing.auditeurId.toString() !== current._id.toString()) {
+
+        // Allow acceptance when:
+        // - existing.auditeurId matches the current user (string or object)
+        // - existing.auditeurId matches an Auditeur doc linked to current user
+        // - existing has rapportAffectation.candidats where a candidate matches current user (by auditeurId or user id)
+        let allowed = false;
+        const userIdStr = String(current._id);
+        // gather auditeur ids linked to this user
+        let auditeurIdsFromAudCollection = [];
+        try {
+          const Auditeur = (() => { try { return require('../models/Auditeur'); } catch (e) { return null; } })();
+          const AudModel = Auditeur && (Auditeur.Auditeur || Auditeur.default || Auditeur);
+          if (AudModel && typeof AudModel.find === 'function') {
+            const auds = await AudModel.find({ userId: current._id }).lean();
+            if (auds && auds.length) auditeurIdsFromAudCollection = auds.map(a => String(a._id));
+          }
+        } catch (e) {}
+
+        const existingAudId = existing.auditeurId && (typeof existing.auditeurId === 'string' ? existing.auditeurId : (existing.auditeurId && (existing.auditeurId._id || existing.auditeurId.id) ? String(existing.auditeurId._id || existing.auditeurId.id) : null));
+        if (existingAudId) {
+          if (existingAudId === userIdStr) allowed = true;
+          if (auditeurIdsFromAudCollection.includes(existingAudId)) allowed = true;
+        }
+
+        if (!existingAudId) {
+          try {
+            const rap = existing.rapportAffectation || existing.report || null;
+            if (rap && Array.isArray(rap.candidats)) {
+              const idx = rap.candidats.findIndex(c => String(c.auditeurId) === userIdStr || String(c.auditeurId) === userIdStr || String(c._id) === userIdStr || auditeurIdsFromAudCollection.includes(String(c.auditeurId)));
+              if (idx !== -1) allowed = true;
+            }
+          } catch (e) {}
+        }
+
+        if (!allowed) {
+          // If auditeurId exists but is an ObjectId referencing User, compare as ObjectId
+          try {
+            if (existing.auditeurId && String(existing.auditeurId) === userIdStr) allowed = true;
+          } catch (e) {}
+        }
+
+        if (!allowed) {
           return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
         }
 
-        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true } }, { new: true }).lean();
+        // Determine which auditeurId to persist: prefer auditeur doc id if present, else user id
+        let audToSet = null;
+        if (auditeurIdsFromAudCollection && auditeurIdsFromAudCollection.length) {
+          // if any candidate matches an auditeur id from aud collection, use that one
+          try {
+            const rap = existing.rapportAffectation || existing.report || null;
+            if (rap && Array.isArray(rap.candidats)) {
+              const match = rap.candidats.find(c => auditeurIdsFromAudCollection.includes(String(c.auditeurId)));
+              if (match) audToSet = match.auditeurId;
+            }
+          } catch (e) {}
+          // fallback to first auditeur id
+          if (!audToSet) audToSet = auditeurIdsFromAudCollection[0];
+        }
+        if (!audToSet) audToSet = current._id;
+
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true, auditeurId: audToSet } }, { new: true }).lean();
         return res.json({ message: 'Affectation acceptée', affectation: updated });
       }
     } catch (e) {
@@ -466,7 +523,44 @@ async function refuseAffectation(req, res) {
 
         const existing = await Model.findById(queryId).lean();
         if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
-        if (existing.auditeurId && existing.auditeurId.toString() !== current._id.toString()) {
+
+        // Similar permissive check as acceptAffectation: allow refuse when
+        // candidate list includes current user or auditeurId matches.
+        let allowed = false;
+        const userIdStr = String(current._id);
+        let auditeurIdsFromAudCollection = [];
+        try {
+          const Auditeur = (() => { try { return require('../models/Auditeur'); } catch (e) { return null; } })();
+          const AudModel = Auditeur && (Auditeur.Auditeur || Auditeur.default || Auditeur);
+          if (AudModel && typeof AudModel.find === 'function') {
+            const auds = await AudModel.find({ userId: current._id }).lean();
+            if (auds && auds.length) auditeurIdsFromAudCollection = auds.map(a => String(a._id));
+          }
+        } catch (e) {}
+
+        const existingAudId = existing.auditeurId && (typeof existing.auditeurId === 'string' ? existing.auditeurId : (existing.auditeurId && (existing.auditeurId._id || existing.auditeurId.id) ? String(existing.auditeurId._id || existing.auditeurId.id) : null));
+        if (existingAudId) {
+          if (existingAudId === userIdStr) allowed = true;
+          if (auditeurIdsFromAudCollection.includes(existingAudId)) allowed = true;
+        }
+
+        if (!existingAudId) {
+          try {
+            const rap = existing.rapportAffectation || existing.report || null;
+            if (rap && Array.isArray(rap.candidats)) {
+              const idx = rap.candidats.findIndex(c => String(c.auditeurId) === userIdStr || auditeurIdsFromAudCollection.includes(String(c.auditeurId)) || String(c._id) === userIdStr);
+              if (idx !== -1) allowed = true;
+            }
+          } catch (e) {}
+        }
+
+        if (!allowed) {
+          try {
+            if (existing.auditeurId && String(existing.auditeurId) === userIdStr) allowed = true;
+          } catch (e) {}
+        }
+
+        if (!allowed) {
           return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
         }
 
