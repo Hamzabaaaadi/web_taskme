@@ -349,4 +349,107 @@ async function listAll(req, res) {
   }
 }
 
-module.exports = { me, update, getById, updateUser, deleteUser, list, listAuditeurs, listAll };
+// Upload avatar and store ImageKit URL in User.avatar (direct REST upload)
+async function uploadAvatar(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+
+    // Allow self or SUPER_ADMIN
+    if (String(current._id) !== String(id) && current.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({ message: 'Accès refusé' });
+    }
+
+    const file = req.file;
+    if (!file) return res.status(400).json({ message: 'Fichier avatar manquant' });
+
+    // Read ImageKit credentials from env
+    const publicKey = process.env.IMAGEKIT_PUBLIC_KEY || process.env.IMAGEKIT_API_KEY || null;
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY || process.env.IMAGEKIT_API_SECRET || null;
+    const uploadEndpoint = process.env.IMAGEKIT_UPLOAD_ENDPOINT || 'https://upload.imagekit.io/api/v1/files/upload';
+    const folderRaw = process.env.IMAGEKIT_FOLDER || 'avatars';
+    const folder = String(folderRaw || 'avatars').replace(/^\/+/, '');
+
+    if (!publicKey || !privateKey) return res.status(500).json({ message: 'ImageKit keys missing in server config' });
+
+    const FormData = require('form-data');
+    const fetch = require('node-fetch');
+
+    const safeFileName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = `avatar_${id}_${Date.now()}_${safeFileName}`;
+
+    const form = new FormData();
+    form.append('file', file.buffer, { filename: fileName, contentType: file.mimetype });
+    form.append('fileName', fileName);
+    if (folder) form.append('folder', folder);
+
+    // Use private key as username with empty password — this variant is accepted by ImageKit
+    const auth = 'Basic ' + Buffer.from(`${privateKey}:`).toString('base64');
+
+    let resp;
+    try {
+      resp = await fetch(uploadEndpoint, {
+        method: 'POST',
+        headers: Object.assign({ Authorization: auth }, form.getHeaders ? form.getHeaders() : {}),
+        body: form
+      });
+    } catch (e) {
+      console.error('Error sending upload request to ImageKit:', e && e.message);
+      return res.status(500).json({ message: 'Impossible d\'atteindre ImageKit' });
+    }
+
+    let body;
+    try { body = await resp.json(); } catch (e) { body = null; }
+
+    if (!resp.ok) {
+      console.error('ImageKit upload failed:', resp.status, body || resp.statusText);
+      return res.status(500).json({ message: 'Upload failed', detail: body || resp.statusText });
+    }
+
+    const avatarUrl = body && (body.url || body.filePath || null);
+    if (!avatarUrl) {
+      console.error('Upload succeeded but no URL returned:', body);
+      return res.status(500).json({ message: 'Upload OK but no URL returned', detail: body });
+    }
+
+    // Persist avatar URL
+    try {
+      const possible = require('../models/User');
+      const Model = possible && (possible.User || possible.default || possible);
+      if (Model && typeof Model.findByIdAndUpdate === 'function') {
+        const updated = await Model.findByIdAndUpdate(id, { $set: { avatar: avatarUrl } }, { new: true }).lean();
+        if (updated) {
+          if (updated.motDePasse) delete updated.motDePasse;
+          if (updated.password) delete updated.password;
+          return res.json({ message: 'Avatar mis à jour', user: updated });
+        }
+      }
+    } catch (e) {
+      // ignore and fallback
+    }
+
+    try {
+      const mongooseLib = require('mongoose');
+      const col = mongooseLib.connection.collection('user');
+      const { ObjectId } = mongooseLib.Types;
+      let queryId = id;
+      try { queryId = new ObjectId(id); } catch (e) {}
+      await col.updateOne({ _id: queryId }, { $set: { avatar: avatarUrl } });
+      const updatedDoc = await col.findOne({ _id: queryId });
+      if (updatedDoc.motDePasse) delete updatedDoc.motDePasse;
+      if (updatedDoc.password) delete updatedDoc.password;
+      return res.json({ message: 'Avatar mis à jour', user: updatedDoc });
+    } catch (e) {
+      console.error('Persist avatar error:', e);
+      return res.status(500).json({ message: 'Impossible de sauvegarder avatar' });
+    }
+  } catch (err) {
+    console.error('uploadAvatar error:', err);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+module.exports = { me, update, getById, updateUser, deleteUser, list, listAuditeurs, listAll, uploadAvatar };

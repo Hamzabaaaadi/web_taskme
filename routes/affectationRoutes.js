@@ -9,6 +9,8 @@ const { basicAuth } = require('../middlewares/authMiddleware');
 router.get('/me', basicAuth, affectationController.getMyAffectations);
 
 router.get('/', affectationController.list);
+// Modifier une affectation (maximum 5 champs: mode, tacheId, auditeurId, dateAffectation, estValidee)
+router.put('/:id', basicAuth, affectationController.updateAffectation);
 router.put('/:id/accept', basicAuth, affectationController.acceptAffectation);
 router.put('/:id/refuse', basicAuth, affectationController.refuseAffectation);
 router.delete('/:id', affectationController.deleteAffectation);

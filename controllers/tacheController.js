@@ -228,6 +228,15 @@ exports.detail = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    // Accept `status` as an alias for the French `statut` field
+    if (req.body && req.body.status) {
+      const allowed = ['CREEE','EN_ATTENTE_AFFECTATION','AFFECTEE','EN_COURS','TERMINEE','ANNULEE'];
+      if (!allowed.includes(req.body.status)) {
+        return res.status(400).json({ message: `status invalide. Valeurs autorisées: ${allowed.join(', ')}` });
+      }
+      req.body.statut = req.body.status;
+      delete req.body.status;
+    }
     const tache = await Tache.create(req.body);
     res.status(201).json({ tache });
   } catch (err) {
@@ -238,6 +247,16 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
+    // Accept `status` as an alias for the French `statut` field in update requests
+    if (req.body && req.body.status) {
+      const allowed = ['CREEE','EN_ATTENTE_AFFECTATION','AFFECTEE','EN_COURS','TERMINEE','ANNULEE'];
+      if (!allowed.includes(req.body.status)) {
+        return res.status(400).json({ message: `status invalide. Valeurs autorisées: ${allowed.join(', ')}` });
+      }
+      req.body.statut = req.body.status;
+      delete req.body.status;
+    }
+
     const tache = await Tache.findByIdAndUpdate(req.params.id, req.body, { new: true }).lean();
     if (!tache) return res.status(404).json({ message: 'Tâche non trouvée' });
     res.json({ tache });

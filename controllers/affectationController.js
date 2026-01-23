@@ -736,4 +736,77 @@ async function validerIA(req, res) {
 }
 
 // Exporter les nouvelles fonctions
-module.exports = { getMyAffectations, list, acceptAffectation, refuseAffectation, deleteAffectation, proposerIA, validerIA };
+async function updateAffectation(req, res) {
+  try {
+    const current = req.user;
+    if (!current) return res.status(401).json({ message: 'Non authentifié' });
+
+    // Only allow coordinators or super admins to modify arbitrary affectations
+    if (!['COORDINATEUR', 'SUPER_ADMIN'].includes(current.role)) {
+      return res.status(403).json({ message: "Accès refusé. Rôle insuffisant pour modifier l'affectation." });
+    }
+
+    const id = req.params.id;
+    if (!id) return res.status(400).json({ message: 'Id requis' });
+
+    const allowedFields = ['mode', 'tacheId', 'auditeurId', 'dateAffectation', 'estValidee'];
+    const payload = req.body || {};
+    const updates = {};
+    for (const k of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(payload, k)) {
+        updates[k] = payload[k];
+      }
+    }
+
+    // Basic validation
+    if (updates.mode) {
+      const allowedModes = ['MANUELLE','SEMIAUTO','AUTOMATIQUE_IA'];
+      if (!allowedModes.includes(updates.mode)) {
+        return res.status(400).json({ message: `mode invalide. Valeurs autorisées: ${allowedModes.join(', ')}` });
+      }
+    }
+
+    // If estValidee is explicitly set to true, set dateReponse
+    if (Object.prototype.hasOwnProperty.call(updates, 'estValidee') && updates.estValidee === true) {
+      updates.dateReponse = new Date();
+    }
+
+    try {
+      const Affectation = require('../models/Affectation');
+      const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
+      if (Model && typeof Model.findByIdAndUpdate === 'function') {
+        const mongooseLib = require('mongoose');
+        const { ObjectId } = mongooseLib.Types;
+        let queryId = id;
+        try { queryId = new ObjectId(id); } catch (e) { }
+
+        const existing = await Model.findById(queryId).lean();
+        if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
+
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: updates }, { new: true }).lean();
+        return res.json({ message: 'Affectation mise à jour', affectation: updated });
+      }
+    } catch (e) {
+      console.warn('updateAffectation model path failed, falling back to raw collection:', e && e.message ? e.message : e);
+    }
+
+    // Fallback to raw collection
+    const mongooseLib = require('mongoose');
+    const col = mongooseLib.connection.collection('affectations');
+    const { ObjectId } = mongooseLib.Types;
+    let queryId = id;
+    try { queryId = new ObjectId(id); } catch (e) { }
+
+    const aff = await col.findOne({ _id: queryId });
+    if (!aff) return res.status(404).json({ message: 'Affectation non trouvée' });
+
+    await col.updateOne({ _id: queryId }, { $set: updates });
+    const updatedDoc = await col.findOne({ _id: queryId });
+    return res.json({ message: 'Affectation mise à jour', affectation: updatedDoc });
+  } catch (err) {
+    console.error('updateAffectation error:', err);
+    return res.status(500).json({ message: 'Erreur serveur' });
+  }
+}
+
+module.exports = { getMyAffectations, list, acceptAffectation, refuseAffectation, deleteAffectation, proposerIA, validerIA, updateAffectation };
