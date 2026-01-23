@@ -18,7 +18,7 @@ async function main() {
     email: email,
     motDePasse: 'Badr123!',
     role: 'AUDITEUR',
-    estActif: true,
+    estActif: false,
     dateCreation: new Date()
   };
 

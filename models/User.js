@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
 
     estActif: {
       type: Boolean,
-      default: true
+      default: false
     },
 
     dateCreation: {

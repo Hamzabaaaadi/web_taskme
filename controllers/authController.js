@@ -28,6 +28,9 @@ async function login(req, res) {
     const match = await bcrypt.compare(password, hashed);
     if (!match) return res.status(400).json({ message: 'Identifiants invalides' });
 
+    // Refuse login if account is not active
+    if (userDoc.estActif === false) return res.status(403).json({ message: "Compte désactivé" });
+
     if (userDoc.motDePasse) delete userDoc.motDePasse;
     if (userDoc.password) delete userDoc.password;
 
@@ -80,7 +83,7 @@ async function register(req, res) {
       createdUser = createdUser.toObject ? createdUser.toObject() : createdUser;
     } else {
       const col = mongoose.connection.collection('user');
-      const insert = await col.insertOne({ nom, prenom, email, motDePasse: hashed, role, dateCreation: new Date(), estActif: true });
+      const insert = await col.insertOne({ nom, prenom, email, motDePasse: hashed, role, dateCreation: new Date(), estActif: false });
       createdUser = await col.findOne({ _id: insert.insertedId });
     }
 

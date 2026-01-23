@@ -41,6 +41,9 @@ async function basicAuth(req, res, next) {
     const ok = await bcrypt.compare(password, hashed);
     if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
 
+    // Block access if account is inactive
+    if (userDoc.estActif === false) return res.status(403).json({ message: 'Compte désactivé' });
+
     if (userDoc.motDePasse) delete userDoc.motDePasse;
     if (userDoc.password) delete userDoc.password;
 

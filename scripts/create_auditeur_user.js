@@ -18,7 +18,7 @@ async function main() {
     email: 'p.dupont@example.com',
     motDePasse: 'AuditeurPass1!',
     role: 'AUDITEUR',
-    estActif: true,
+    estActif: false,
     dateCreation: new Date()
   };
 
