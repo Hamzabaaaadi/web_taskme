@@ -59,6 +59,10 @@ app.use('/api/affectations', affectationRoutes);
 // Delegation routes
 const delegationRoutes = require('./routes/delegationRoutes');
 app.use('/api/delegations', delegationRoutes);
+// ...existing code...
+const chatsRouter = require('./routes/chatRoutes')
+app.use('/chats', chatsRouter)
+// ...existing code...
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);

@@ -473,7 +473,7 @@ async function acceptAffectation(req, res) {
         }
         if (!audToSet) audToSet = current._id;
 
-        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true, auditeurId: audToSet } }, { new: true }).lean();
+        const updated = await Model.findByIdAndUpdate(queryId, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), auditeurId: audToSet } }, { new: true }).lean();
         return res.json({ message: 'Affectation acceptée', affectation: updated });
       }
     } catch (e) {
@@ -493,7 +493,7 @@ async function acceptAffectation(req, res) {
       return res.status(403).json({ message: 'Vous n\'êtes pas l\'auditeur assigné' });
     }
 
-    await col.updateOne({ _id: queryId }, { $set: { statut: 'ACCEPTEE', dateReponse: new Date(), estValidee: true } });
+    await col.updateOne({ _id: queryId }, { $set: { statut: 'ACCEPTEE', dateReponse: new Date() } });
     const updatedDoc = await col.findOne({ _id: queryId });
     return res.json({ message: 'Affectation acceptée', affectation: updatedDoc });
   } catch (err) {
