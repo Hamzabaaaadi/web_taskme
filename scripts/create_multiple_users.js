@@ -98,7 +98,7 @@ async function main() {
         email: u.email,
         motDePasse: hashed,
         role: u.role,
-        estActif: true,
+        estActif: false,
         dateCreation: new Date()
       };
 
