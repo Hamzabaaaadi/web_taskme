@@ -54,7 +54,15 @@ exports.assign = async (req, res) => {
       mode: chosenMode,
       dateAffectation: new Date()
     });
+
     await affectation.save();
+    // Mettre à jour le statut de la tâche en 'AFFECTEE'
+    try {
+      tache.statut = 'AFFECTEE';
+      await tache.save();
+    } catch (err) {
+      console.warn('Erreur lors de la mise à jour du statut de la tâche:', err && err.message ? err.message : err);
+    }
 
     // Create a Notification for the destinataire so the auditor receives the request
     try {
@@ -237,6 +245,8 @@ exports.create = async (req, res) => {
       req.body.statut = req.body.status;
       delete req.body.status;
     }
+    // Forcer le statut à 'EN_ATTENTE_AFFECTATION' lors de la création
+    req.body.statut = 'EN_ATTENTE_AFFECTATION';
     const tache = await Tache.create(req.body);
     // Create a Chat associated with this task so a conversation exists by default
     try {
