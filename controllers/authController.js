@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const jwtConfig = require('../config/jwt');
 
 async function login(req, res) {
   const { email, password } = req.body || {};
@@ -34,7 +35,10 @@ async function login(req, res) {
     if (userDoc.motDePasse) delete userDoc.motDePasse;
     if (userDoc.password) delete userDoc.password;
 
-    return res.json({ message: 'Connexion réussie', user: userDoc });
+    // Sign JWT
+    const token = jwtConfig.signToken({ id: userDoc._id });
+
+    return res.json({ message: 'Connexion réussie', user: userDoc, token });
   } catch (err) {
     console.error('Auth login error:', err);
     return res.status(500).json({ message: 'Erreur serveur' });

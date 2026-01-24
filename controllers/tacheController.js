@@ -56,19 +56,20 @@ exports.assign = async (req, res) => {
     });
     await affectation.save();
 
-    // Create a Notification for the destinataire so the auditor receives the request
+    // Create and send notification via service (persist + realtime/email)
     try {
-      const Notification = require('../models/Notification');
-      const notif = new Notification({
-        destinataireId: resolvedAuditeurId,
+      const notificationService = require('../services/notificationService');
+      await notificationService.createAndSend({
         type: 'AFFECTATION',
         titre: chosenMode === 'SEMIAUTO' ? 'Proposition d\'affectation' : 'Affectation',
         message: `Vous avez une nouvelle ${chosenMode === 'SEMIAUTO' ? 'proposition' : 'affectation'} pour la tâche: ${tache && tache.nom ? tache.nom : String(tacheId)}`,
-        dateEnvoi: new Date()
+        data: { tacheId: tacheId },
+        recipients: [resolvedAuditeurId],
+        sendEmail: false,
+        realtime: true
       });
-      await notif.save();
     } catch (e) {
-      console.warn('Failed to create notification for affectation:', e && e.message ? e.message : e);
+      console.warn('Failed to create/send notification for affectation:', e && e.message ? e.message : e);
     }
 
     return res.status(201).json({
