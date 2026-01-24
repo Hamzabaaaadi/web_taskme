@@ -229,6 +229,14 @@ exports.detail = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const tache = await Tache.create(req.body);
+    // Create a Chat associated with this task so a conversation exists by default
+    try {
+      const Chat = require('../models/Chat');
+      await Chat.create({ tacheId: tache._id || tache.id });
+    } catch (chatErr) {
+      console.warn('Failed to create chat for tache:', chatErr && chatErr.message ? chatErr.message : chatErr);
+    }
+
     res.status(201).json({ tache });
   } catch (err) {
     console.error('Erreur création tâche:', err);

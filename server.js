@@ -57,6 +57,10 @@ app.use('/api/affectations', affectationRoutes);
 // Delegation routes
 const delegationRoutes = require('./routes/delegationRoutes');
 app.use('/api/delegations', delegationRoutes);
+// ...existing code...
+const chatsRouter = require('./routes/chatRoutes')
+app.use('/chats', chatsRouter)
+// ...existing code...
 
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 module.exports = app;
