@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const auditeurSchema = new mongoose.Schema(
   {
@@ -13,4 +13,4 @@ const auditeurSchema = new mongoose.Schema(
   { collection: 'auditeurs' }
 );
 
-module.exports = mongoose.model('Auditeur', auditeurSchema);
+export default mongoose.model('Auditeur', auditeurSchema);

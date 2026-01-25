@@ -1,21 +1,25 @@
 
-require('dns').setServers(['8.8.8.8', '8.8.4.4']);
-require('dotenv').config();
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const mongoose = require('mongoose');
-// Ensure Mongoose models are registered (User model required for populate to work)
-require('./models/User');
-const cors = require('cors');
-const app = express();
-require("dotenv").config();
-const socketLib = require('./lib/socket');
+import dns from 'dns';
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
-const searchRoutes = require('./routes/searchRoutes');
-const vehiculeRoutes = require('./routes/vehiculeRoutes');
-const semiautoRoutes = require('./routes/semiautoRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import mongoose from 'mongoose';
+// Ensure Mongoose models are registered (User model required for populate to work)
+import './models/User.js';
+import cors from 'cors';
+const app = express();
+
+import socketLib from './lib/socket.js';
+
+import searchRoutes from './routes/searchRoutes.js';
+import vehiculeRoutes from './routes/vehiculeRoutes.js';
+import semiautoRoutes from './routes/semiautoRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const PORT = process.env.PORT || 5001;
 
@@ -34,34 +38,34 @@ app.use('/api/vehicles', vehiculeRoutes);
 app.use('/api/semiauto', semiautoRoutes);
 
 // // Routes
-const tacheRoutes = require('./routes/tacheRoutes');
+import tacheRoutes from './routes/tacheRoutes.js';
 app.use('/api/tasks', tacheRoutes);
 
 // Assignment routes
-const assignmentRoutes = require('./routes/assignmentRoutes');
+import assignmentRoutes from './routes/assignmentRoutes.js';
 app.use('/api/assignments', assignmentRoutes);
 
-const auditeurRoutes = require('./routes/auditeurRoutes');
+import auditeurRoutes from './routes/auditeurRoutes.js';
 app.use('/api/auditeurs', auditeurRoutes);
 
 // Auth routes
-const authRoutes = require('./routes/authRoutes');
+import authRoutes from './routes/authRoutes.js';
 app.use('/api/auth', authRoutes);
 
 // User routes
-const userRoutes = require('./routes/userRoutes');
+import userRoutes from './routes/userRoutes.js';
 app.use('/api/users', userRoutes);
 
 // Affectation routes
-const affectationRoutes = require('./routes/affectationRoutes');
+import affectationRoutes from './routes/affectationRoutes.js';
 app.use('/api/affectations', affectationRoutes);
 
 // Delegation routes
-const delegationRoutes = require('./routes/delegationRoutes');
+import delegationRoutes from './routes/delegationRoutes.js';
 app.use('/api/delegations', delegationRoutes);
 // ...existing code...
-const chatsRouter = require('./routes/chatRoutes')
-app.use('/chats', chatsRouter)
+import chatsRouter from './routes/chatRoutes.js';
+app.use('/chats', chatsRouter);
 // ...existing code...
 
 // Notification routes
@@ -72,7 +76,7 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*', methods: ['GET','POST','PUT'] } });
 
 // simple socket auth middleware: expects handshake.auth.token to be userId or a JWT
-const jwtConfig = require('./config/jwt');
+import jwtConfig from './config/jwt.js';
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth && socket.handshake.auth.token;
@@ -98,4 +102,4 @@ io.on('connection', (socket) => {
 socketLib.init(io);
 
 server.listen(PORT, () => console.log(`Server running on ${PORT}`));
-module.exports = app;
+export default app;

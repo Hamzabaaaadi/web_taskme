@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const HistoriqueSchema = new mongoose.Schema({
   id: String,
@@ -8,4 +8,4 @@ const HistoriqueSchema = new mongoose.Schema({
   dateAction: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Historique', HistoriqueSchema);
+export default mongoose.model('Historique', HistoriqueSchema);

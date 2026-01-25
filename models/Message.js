@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const MessageSchema = new mongoose.Schema({
   id: String,
@@ -8,4 +8,4 @@ const MessageSchema = new mongoose.Schema({
   estLu: { type: Boolean, default: false }
 }, { timestamps: true });
 
-module.exports = mongoose.model('Message', MessageSchema);
+export default mongoose.model('Message', MessageSchema);

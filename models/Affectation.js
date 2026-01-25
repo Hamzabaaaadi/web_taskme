@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const AffectationSchema = new mongoose.Schema({
   id: String,
@@ -38,4 +38,4 @@ AffectationSchema.add({
   confidenceScore: Number
 });
 
-module.exports = mongoose.model('Affectation', AffectationSchema);
+export default mongoose.model('Affectation', AffectationSchema);

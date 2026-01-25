@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const CandidateSchema = new mongoose.Schema({
   auditorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -21,4 +21,4 @@ const AssignmentProposalSchema = new mongoose.Schema({
   decisionComment: String
 });
 
-module.exports = mongoose.model('AssignmentProposal', AssignmentProposalSchema);
+export default mongoose.model('AssignmentProposal', AssignmentProposalSchema);
