@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const TacheSchema = new mongoose.Schema({
   id: String,
@@ -21,4 +21,4 @@ const TacheSchema = new mongoose.Schema({
   chat: { type: mongoose.Schema.Types.ObjectId, ref: 'Chat', default: null }
 });
 
-export default mongoose.model('Tache', TacheSchema);
+module.exports = mongoose.model('Tache', TacheSchema);

@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const ChatSchema = new mongoose.Schema({
   id: String,
@@ -8,4 +8,4 @@ const ChatSchema = new mongoose.Schema({
   dateCreation: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-export default mongoose.model('Chat', ChatSchema);
+module.exports = mongoose.model('Chat', ChatSchema);

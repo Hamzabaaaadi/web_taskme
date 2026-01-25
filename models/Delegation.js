@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const DelegationSchema = new mongoose.Schema({
   id: String,
@@ -11,4 +11,4 @@ const DelegationSchema = new mongoose.Schema({
   dateReponse: Date
 }, { timestamps: true });
 
-export default mongoose.model('Delegation', DelegationSchema);
+module.exports = mongoose.model('Delegation', DelegationSchema);

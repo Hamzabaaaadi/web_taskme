@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const NotificationSchema = new mongoose.Schema({
   id: String,
@@ -10,4 +10,4 @@ const NotificationSchema = new mongoose.Schema({
   dateEnvoi: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-export default mongoose.model('Notification', NotificationSchema);
+module.exports = mongoose.model('Notification', NotificationSchema);
