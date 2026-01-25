@@ -1,6 +1,9 @@
 {
   "name": "www-backend",
   "version": "0.1.0",
+  "engines": {
+    "node": "18.x"
+  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
