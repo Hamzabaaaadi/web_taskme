@@ -14,7 +14,7 @@ const socketLib = require('./lib/socket');
 
 const searchRoutes = require('./routes/searchRoutes');
 const vehiculeRoutes = require('./routes/vehiculeRoutes');
-const semiautoRoutes = require('./routes/semiautoRoutes');
+const semiautoRoutes = require('./routes/semiAutoRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
 const PORT = process.env.PORT || 5001;
