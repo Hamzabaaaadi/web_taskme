@@ -1,20 +1,57 @@
 const Chat = require('../models/Chat')
 const Message = require('../models/Message')
 
+const User = require('../models/User')
+const Auditeur = require('../models/Auditeur')
+
+// Fonction utilitaire pour récupérer _id, nom, prenom de l'expéditeur (User ou Auditeur)
+async function getExpediteurInfo(expediteurId) {
+  let user = await User.findById(expediteurId).select('_id nom prenom').lean()
+  if (user) {
+    return { _id: user._id, nom: user.nom, prenom: user.prenom }
+  }
+  let auditeur = await Auditeur.findById(expediteurId).lean()
+  if (auditeur) {
+    let userAud = await User.findById(auditeur.userId).select('_id nom prenom').lean()
+    if (userAud) {
+      return { _id: auditeur._id, nom: userAud.nom, prenom: userAud.prenom }
+    }
+  }
+  return null
+}
+
 exports.getChatByTask = async (req, res) => {
   try {
     const { taskId } = req.query
     if (!taskId) return res.status(400).json({ error: 'taskId required' })
-    const chat = await Chat.findOne({ tacheId: taskId })
-      .populate({ path: 'messages', populate: { path: 'expediteurId', select: '_id nom prenom' } })
+    let chat = await Chat.findOne({ tacheId: taskId })
       .populate('participants', '_id nom prenom')
       .lean()
-    return res.json({ chat })
+
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' })
+    }
+
+    // Récupérer tous les messages
+    let messages = []
+    if (Array.isArray(chat.messages) && chat.messages.length) {
+      const rawMessages = await Message.find({ _id: { $in: chat.messages } }).lean()
+      messages = await Promise.all(rawMessages.map(async msg => {
+        const expediteur = await getExpediteurInfo(msg.expediteurId)
+        return {
+          ...msg,
+          expediteur
+        }
+      }))
+    }
+
+    return res.json({ chat: { ...chat, messages } })
   } catch (e) {
     console.error(e)
     return res.status(500).json({ error: e.message })
   }
 }
+
 
 exports.createOrPost = async (req, res) => {
   try {
