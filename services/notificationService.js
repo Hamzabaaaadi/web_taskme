@@ -55,4 +55,12 @@ async function markRead(notificationId, userId) {
   return notif;
 }
 
-module.exports = { createAndSend, listForUser, markRead };
+async function deleteNotification(notificationId, userId) {
+  const notif = await Notification.findById(notificationId);
+  if (!notif) throw new Error('Notification not found');
+  if (String(notif.destinataireId) !== String(userId)) throw new Error('Not allowed');
+  await Notification.deleteOne({ _id: notificationId });
+  return { deletedId: notificationId };
+}
+
+module.exports = { createAndSend, listForUser, markRead, deleteNotification };
