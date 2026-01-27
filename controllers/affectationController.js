@@ -331,66 +331,63 @@ async function getMyAffectations(req, res) {
 
 async function list(req, res) {
   try {
-    // Try Mongoose model first and populate some related fields for convenience
-    try {
-      const Affectation = require('../models/Affectation');
-      const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
-      if (Model && typeof Model.find === 'function') {
-        const query = req.query || {};
-        const affectations = await Model.find(query)
-          .populate('tacheId', 'nom statut')
-          .populate('auditeurId', 'nom prenom email')
-          .lean();
+    const Affectation = require('../models/Affectation');
+    const Model = Affectation && (Affectation.Affectation || Affectation.default || Affectation);
 
-        // Fill raw auditeurId when populate returned null
-        try {
-          const col = mongoose.connection.collection('affectations');
-          const ids = (affectations || []).map(a => a._id);
-          if (ids.length > 0) {
-            const rawDocs = await col.find({ _id: { $in: ids } }).project({ auditeurId: 1 }).toArray();
-            const rawMap = new Map(rawDocs.map(d => [d._id.toString(), d.auditeurId]));
-            for (const a of affectations) {
-              if ((a.auditeurId === null || a.auditeurId === undefined) && rawMap.has(a._id.toString())) {
-                a.auditeurId = rawMap.get(a._id.toString());
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('Could not fetch raw auditeurId fallback:', e && e.message ? e.message : e);
-        }
+    // 🔹 Filtre principal : ignorer auditeurId null
+    const baseQuery = {
+      ...req.query,
+      auditeurId: { $ne: null }
+    };
 
-        // ensure `mode` is present (schema default should handle new docs)
-        const normalized = (affectations || []).map(a => { if (!a.mode) a.mode = 'MANUELLE'; return a; });
+    if (Model && typeof Model.find === 'function') {
+      let affectations = await Model.find(baseQuery)
+        .populate('tacheId', 'nom statut')
+        .populate('auditeurId', 'nom prenom email')
+        .lean();
 
-        await enrichSemiAutoNames(normalized);
-        return res.json({ affectations: normalized });
-      }
-    } catch (e) {
-      console.error('affectationController.list model error:', e && e.message ? e.message : e);
+      // 🔹 Sécurité : enlever ceux dont populate a échoué
+      affectations = affectations.filter(a => a.auditeurId !== null);
+
+      // 🔹 Normalisation mode
+      affectations = affectations.map(a => {
+        if (!a.mode) a.mode = 'MANUELLE';
+        return a;
+      });
+
+      await enrichSemiAutoNames(affectations);
+      return res.json({ affectations });
     }
 
-    // Fallback to raw collection with explicit projection to include `mode`
+    // ================= FALLBACK =================
     const col = mongoose.connection.collection('affectations');
-    const projection = { projection: { mode: 1, tacheId: 1, auditeurId: 1, statut: 1, dateAffectation: 1, dateReponse:1 } };
-    const affectations = await col.find(req.query || {}, projection).toArray();
-    const normalized = (affectations || []).map(a => {
+    const affectations = await col.find(
+      { ...baseQuery },
+      {
+        projection: {
+          mode: 1,
+          tacheId: 1,
+          auditeurId: 1,
+          statut: 1,
+          dateAffectation: 1,
+          dateReponse: 1
+        }
+      }
+    ).toArray();
+
+    const normalized = affectations.map(a => {
       if (!a.mode) a.mode = 'MANUELLE';
       return a;
     });
-    // Ensure SEMIAUTO auditeurId is an object {_id, nom, prenom} for consistency
-    for (const a of normalized) {
-      if (a.mode === 'SEMIAUTO') {
-        const aid = a.auditeurId && (typeof a.auditeurId === 'string' ? a.auditeurId : (a.auditeurId && (a.auditeurId._id || a.auditeurId.id) ? (a.auditeurId._id || a.auditeurId.id) : null));
-        if (aid && typeof a.auditeurId === 'string') {
-          a.auditeurId = { _id: aid, nom: null, prenom: null };
-        }
-      }
-    }
+
     return res.json({ affectations: normalized });
+
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Erreur serveur', err });
   }
 }
+
 
 async function acceptAffectation(req, res) {
   try {
