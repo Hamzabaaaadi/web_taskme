@@ -7,7 +7,7 @@ router.get('/', tacheController.list);
 // Retourne le nombre total de tâches (peut être filtré via query)
 router.get('/count', tacheController.count);
 router.get('/:id', tacheController.detail);
-router.post('/', tacheController.create);
+router.post('/', upload.single('file'), tacheController.create);
 router.put('/:id', tacheController.update);
 router.delete('/:id', tacheController.delete);
 router.post('/:id/file', upload.single('file'), tacheController.uploadFile);

@@ -249,6 +249,45 @@ exports.detail = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    // If a file was uploaded (multipart/form-data), handle upload to ImageKit
+    try {
+      if (req.file) {
+        const imagekit = require('../config/imagekit');
+        const fs = require('fs');
+        // generate filename for local fallback
+        const ext = (req.file.originalname && req.file.originalname.includes('.')) ? ('.' + req.file.originalname.split('.').pop()) : '';
+        const filename = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+        let fileUrl = null;
+        if (imagekit && req.file.buffer) {
+          try {
+            const base64 = req.file.buffer.toString('base64');
+            const uploadResp = await imagekit.upload({
+              file: base64,
+              fileName: req.file.originalname || filename,
+              folder: (process.env.IMAGEKIT_FOLDER || '').replace(/^\//, '') || 'documents'
+            });
+            if (uploadResp && uploadResp.url) fileUrl = uploadResp.url;
+          } catch (e) {
+            console.warn('ImageKit upload failed, falling back to local file:', e && e.message ? e.message : e);
+          }
+        }
+        if (!fileUrl) {
+          // fallback: write to uploads and construct local URL
+          const uploadDir = path.join(__dirname, '..', 'uploads');
+          if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+          const localPath = path.join(uploadDir, filename);
+          fs.writeFileSync(localPath, req.file.buffer || req.file.buffer);
+          const base = (process.env.BASE_URL && process.env.BASE_URL.replace(/\/$/, '')) || `${req.protocol}://${req.get('host')}`;
+          fileUrl = `${base}/uploads/${encodeURIComponent(filename)}`;
+        }
+        // attach to body so below logic saves it
+        req.body = req.body || {};
+        req.body.fichierAdministratif = fileUrl;
+      }
+    } catch (e) {
+      console.warn('File handling in create() failed:', e && e.message ? e.message : e);
+    }
+
     // Accept `status` as an alias for the French `statut` field
     if (req.body && req.body.status) {
       const allowed = ['CREEE','EN_ATTENTE_AFFECTATION','AFFECTEE','EN_COURS','TERMINEE','ANNULEE'];
@@ -309,7 +348,35 @@ exports.delete = async (req, res) => {
 exports.uploadFile = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'Fichier requis' });
-    const tache = await Tache.findByIdAndUpdate(req.params.id, { fichierAdministratif: req.file.filename }, { new: true }).lean();
+    const fs = require('fs');
+    // prepare filename
+    const ext = (req.file.originalname && req.file.originalname.includes('.')) ? ('.' + req.file.originalname.split('.').pop()) : '';
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+    let fileUrl = null;
+    try {
+      const imagekit = require('../config/imagekit');
+      if (imagekit && req.file.buffer) {
+        const base64 = req.file.buffer.toString('base64');
+        const uploadResp = await imagekit.upload({
+          file: base64,
+          fileName: req.file.originalname || filename,
+          folder: (process.env.IMAGEKIT_FOLDER || '').replace(/^\//, '') || 'documents'
+        });
+        if (uploadResp && uploadResp.url) fileUrl = uploadResp.url;
+      }
+    } catch (e) {
+      console.warn('ImageKit upload failed in uploadFile, falling back to local:', e && e.message ? e.message : e);
+    }
+    if (!fileUrl) {
+      const uploadDir = path.join(__dirname, '..', 'uploads');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      const localPath = path.join(uploadDir, filename);
+      fs.writeFileSync(localPath, req.file.buffer || req.file.buffer);
+      const base = (process.env.BASE_URL && process.env.BASE_URL.replace(/\/$/, '')) || `${req.protocol}://${req.get('host')}`;
+      fileUrl = `${base}/uploads/${encodeURIComponent(filename)}`;
+    }
+
+    const tache = await Tache.findByIdAndUpdate(req.params.id, { fichierAdministratif: fileUrl }, { new: true }).lean();
     if (!tache) return res.status(404).json({ message: 'Tâche non trouvée' });
     res.json({ message: 'Fichier uploadé', tache });
   } catch (err) {
