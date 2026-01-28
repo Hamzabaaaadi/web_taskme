@@ -643,8 +643,26 @@ async function deleteAffectation(req, res) {
         const existing = await Model.findById(queryId).lean();
         if (!existing) return res.status(404).json({ message: 'Affectation non trouvée' });
 
+        // Supprimer les délégations associées si le modèle existe
+        try {
+          const Delegation = require('../models/Delegation');
+          const DelModel = Delegation && (Delegation.Delegation || Delegation.default || Delegation);
+          if (DelModel && typeof DelModel.deleteMany === 'function') {
+            await DelModel.deleteMany({ affectationId: queryId });
+          } else {
+            await mongooseLib.connection.collection('delegations').deleteMany({ affectationId: queryId });
+          }
+        } catch (e) {
+          // fallback: try raw collection deletion by ObjectId then string
+          try {
+            await mongooseLib.connection.collection('delegations').deleteMany({ affectationId: queryId });
+          } catch (e2) {
+            try { await mongooseLib.connection.collection('delegations').deleteMany({ affectationId: String(queryId) }); } catch (e3) { /* ignore */ }
+          }
+        }
+
         await Model.findByIdAndDelete(queryId);
-        return res.json({ message: 'Affectation supprimée' });
+        return res.json({ message: 'Affectation et délégations associées supprimées' });
       }
     } catch (e) {
       console.error('deleteAffectation model error:', e && e.message ? e.message : e);
@@ -660,8 +678,20 @@ async function deleteAffectation(req, res) {
     const aff = await col.findOne({ _id: queryId });
     if (!aff) return res.status(404).json({ message: 'Affectation non trouvée' });
 
+    // Supprimer délégations associées (essayer objectId puis string)
+    try {
+      const delegCol = mongooseLib.connection.collection('delegations');
+      try {
+        await delegCol.deleteMany({ affectationId: queryId });
+      } catch (e) {
+        try { await delegCol.deleteMany({ affectationId: String(queryId) }); } catch (e2) { /* ignore */ }
+      }
+    } catch (e) {
+      // ignore delegation deletion failure and proceed to delete affectation
+    }
+
     await col.deleteOne({ _id: queryId });
-    return res.json({ message: 'Affectation supprimée' });
+    return res.json({ message: 'Affectation et délégations associées supprimées' });
   } catch (err) {
     console.error('deleteAffectation error:', err);
     return res.status(500).json({ message: 'Erreur serveur' });
