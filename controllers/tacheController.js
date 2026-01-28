@@ -48,6 +48,18 @@ exports.assign = async (req, res) => {
 
     // Créer l'affectation réelle
     const Affectation = require('../models/Affectation');
+
+    // Vérifier s'il existe déjà une affectation active pour ce couple (tache, auditeur)
+    // On considère comme non-actives les affectations refusées ou expirées
+    const existing = await Affectation.findOne({
+      tacheId,
+      auditeurId: resolvedAuditeurId,
+      statut: { $nin: ['EXPIREE'] }
+    });
+    if (existing) {
+      return res.status(400).json({ error: 'Auditeur déjà affecté à cette tâche (affectation existante).' });
+    }
+
     const affectation = new Affectation({
       tacheId,
       auditeurId: resolvedAuditeurId,
