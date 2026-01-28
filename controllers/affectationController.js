@@ -27,6 +27,8 @@ async function getExpediteurInfo(expediteurId) {
   }
   return { _id: String(expediteurId), nom: null, prenom: null, email: null };
 
+}
+
 const mongoose = require('mongoose');
 
 // Helper: ensure SEMIAUTO affectations have auditeurId as object {_id, nom, prenom}
