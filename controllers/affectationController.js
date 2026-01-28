@@ -1,3 +1,34 @@
+// Utilitaire pour enrichir un ID (User ou Auditeur) avec nom, prenom, email
+async function getExpediteurInfo(expediteurId) {
+  if (!expediteurId) return { _id: null, nom: null, prenom: null, email: null };
+  const User = require('../models/User');
+  const UserModel = User && (User.User || User.default || User);
+  const Auditeur = (() => { try { return require('../models/Auditeur'); } catch (e) { return null; } })();
+  const AudModel = Auditeur && (Auditeur.Auditeur || Auditeur.default || Auditeur);
+  let user = null;
+  if (UserModel && typeof UserModel.findById === 'function') {
+    user = await UserModel.findById(expediteurId).select('_id nom prenom email').lean();
+    if (user) return { _id: user._id, nom: user.nom, prenom: user.prenom, email: user.email };
+  }
+  let auditeur = null;
+  if (AudModel && typeof AudModel.findById === 'function') {
+    auditeur = await AudModel.findById(expediteurId).lean();
+    if (auditeur) {
+      let userAud = null;
+      if (auditeur.userId && UserModel && typeof UserModel.findById === 'function') {
+        userAud = await UserModel.findById(auditeur.userId).select('_id nom prenom email').lean();
+      }
+      if (userAud) {
+        return { _id: auditeur._id, nom: userAud.nom, prenom: userAud.prenom, email: userAud.email };
+      } else {
+        return { _id: auditeur._id, nom: auditeur.nom || null, prenom: auditeur.prenom || null, email: auditeur.email || null };
+      }
+    }
+  }
+  return { _id: String(expediteurId), nom: null, prenom: null, email: null };
+
+
+  
 const mongoose = require('mongoose');
 
 // Helper: ensure SEMIAUTO affectations have auditeurId as object {_id, nom, prenom}
@@ -343,17 +374,20 @@ async function list(req, res) {
     if (Model && typeof Model.find === 'function') {
       let affectations = await Model.find(baseQuery)
         .populate('tacheId', 'nom statut')
-        .populate('auditeurId', 'nom prenom email')
         .lean();
-
-      // 🔹 Sécurité : enlever ceux dont populate a échoué
-      affectations = affectations.filter(a => a.auditeurId !== null);
 
       // 🔹 Normalisation mode
       affectations = affectations.map(a => {
         if (!a.mode) a.mode = 'MANUELLE';
         return a;
       });
+
+
+      // Utiliser getExpediteurInfo pour chaque auditeurId
+      for (const a of affectations) {
+        const aid = a.auditeurId && (typeof a.auditeurId === 'string' ? a.auditeurId : (a.auditeurId && (a.auditeurId._id || a.auditeurId.id) ? (a.auditeurId._id || a.auditeurId.id) : null));
+        a.auditeurId = await getExpediteurInfo(aid);
+      }
 
       await enrichSemiAutoNames(affectations);
       return res.json({ affectations });
