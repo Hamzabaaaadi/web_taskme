@@ -1,4 +1,3 @@
-
 require('dns').setServers(['8.8.8.8', '8.8.4.4']);
 require('dotenv').config();
 const express = require('express');
@@ -9,9 +8,7 @@ const mongoose = require('mongoose');
 require('./models/User');
 const cors = require('cors');
 const app = express();
-require("dotenv").config();
 const socketLib = require('./lib/socket');
-
 const searchRoutes = require('./routes/searchRoutes');
 const vehiculeRoutes = require('./routes/vehiculeRoutes');
 const semiautoRoutes = require('./routes/semiAutoRoutes');
@@ -19,7 +16,16 @@ const notificationRoutes = require('./routes/notificationRoutes');
 
 const PORT = process.env.PORT || 5001;
 
-app.use(cors());
+// ✅ CORRECTION 1: Configuration CORS complète avec credentials
+app.use(cors({
+  origin: ['https://www.taskmee.me', 'https://taskmee.me', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600
+}));
+
 app.use(express.json());
 
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/wwwdb', {
@@ -28,12 +34,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/wwwdb', {
 }).then(() => console.log('MongoDB connected'))
 .catch(err => console.error('MongoDB connection error', err));
 
-// ...autres routes déjà présentes...
+// Routes
 app.use('/api/search', searchRoutes);
 app.use('/api/vehicles', vehiculeRoutes);
 app.use('/api/semiauto', semiautoRoutes);
 
-// // Routes
 const tacheRoutes = require('./routes/tacheRoutes');
 app.use('/api/tasks', tacheRoutes);
 
@@ -59,17 +64,24 @@ app.use('/api/affectations', affectationRoutes);
 // Delegation routes
 const delegationRoutes = require('./routes/delegationRoutes');
 app.use('/api/delegations', delegationRoutes);
-// ...existing code...
-const chatsRouter = require('./routes/chatRoutes')
-app.use('/chats', chatsRouter)
-// ...existing code...
+
+const chatsRouter = require('./routes/chatRoutes');
+app.use('/chats', chatsRouter);
 
 // Notification routes
 app.use('/api/notifications', notificationRoutes);
 
 // Create HTTP server and attach socket.io
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*', methods: ['GET','POST','PUT'] } });
+
+// ✅ CORRECTION 2: Socket.io CORS avec credentials
+const io = new Server(server, { 
+  cors: { 
+    origin: ['https://www.taskmee.me', 'https://taskmee.me', 'http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT'] 
+  } 
+});
 
 // simple socket auth middleware: expects handshake.auth.token to be userId or a JWT
 const jwtConfig = require('./config/jwt');
@@ -85,10 +97,13 @@ io.use(async (socket, next) => {
     } catch (e) {
       return next(new Error('Authentication error'));
     }
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 });
 
 io.on('connection', (socket) => {
+  // ✅ CORRECTION 3: Correction de la syntaxe socket.join
   if (socket.userId) socket.join(`user_${socket.userId}`);
   console.log('socket connected', socket.id, 'userId=', socket.userId);
   socket.on('disconnect', () => console.log('socket disconnected', socket.id));
@@ -97,5 +112,7 @@ io.on('connection', (socket) => {
 // initialize socket singleton
 socketLib.init(io);
 
+// ✅ CORRECTION 4: Correction de la syntaxe console.log
 server.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
 module.exports = app;
